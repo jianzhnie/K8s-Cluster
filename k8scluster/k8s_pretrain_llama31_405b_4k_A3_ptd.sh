@@ -6,7 +6,32 @@
 # =============================================================================
 
 # 引用公共环境脚本
-source $(dirname "$0")/k8s_common_env.sh
+# source $(dirname "$0")/k8s_common_env.sh
+source ~/.bashrc
+
+mkdir -p /job/code/alllogs/$MINDX_TASK_ID/ttplogs
+mkdir -p /job/code/alllogs/$MINDX_TASK_ID/trainlogs
+mkdir -p /job/data/output/ckpt
+
+# env for breakpoint ckpt
+export RESUME_MODE_ENABLE=1
+
+export ASCEND_GLOBAL_LOG_LEVEL=2                                                    # 设置plog等级为info，应根据实际需要设计等级
+# 日志保存路径可根据实际情况修改
+export ASCEND_PROCESS_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/plogs/$XDL_IP       # 设置plog保存路径，其中$MINDX_TASK_ID为ascend-operator注入的任务uid环境变量，$XDL_IP为任务yaml中写入的环境变量，status.hostIP
+export TTP_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/ttplogs/ttplog$XDL_IP-$RANK    # 设置ttp日志保存路径，其中$RANK为ascend-operator为pytorch框架注入的环境变量
+export TRAIN_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/trainlogs/$XDL_IP-$RANK      # 设置训练日志保存路径
+
+export HCCL_ASYNC_ERROR_HANDLING=0                 # 当HCCL_ASYNC_ERROR_HANDLING为0时，表示关闭watchdog功能。如果开启watchdog功能，可能会影响进程级恢复的正常使用。
+export GLOO_SOCKET_IFNAME=enp66s0f0               # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
+export HCCL_SOCKET_IFNAME=enp66s0f0               # 如任务yaml中配置hostNetwork为false，则设置为eth0
+export TTP_OT=360
+export HCCL_CONNECT_TIMEOUT=1800
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export NPU_ASD_ENABLE=0
+export TASK_QUEUE_ENABLE=2
+
 
 # =============================================================================
 # Llama3.1 405B 4K Training Paths
@@ -16,6 +41,37 @@ CKPT_SAVE_DIR="/job/data/output/ckpt"
 DATA_PATH="/job/data/datasets/part00_text_document"
 TOKENIZER_PATH="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
 CKPT_LOAD_DIR="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
+
+
+if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
+  export TTP_ADDR=$POD_IP
+else
+  export TTP_ADDR=$MASTER_ADDR                     # 集群主节点的IP地址
+fi
+echo ${TTP_PORT}
+echo ${TTP_ADDR}
+
+if [[ "${LOCAL_WORLD_SIZE}" == "" ]]; then
+    device_count=1
+    server_count=1
+else
+    # 获取环境变量中的device_count字段
+    device_count=${LOCAL_WORLD_SIZE}
+    if [[ "${device_count}" -eq 0 ]]; then
+      echo "device count is 0, train job failed." | tee -a hccl.log
+      chmod 440 ${output_url}
+      exit 1
+    fi
+    # 获取环境变量中的server_count字段
+    server_count=`expr ${WORLD_SIZE} / ${LOCAL_WORLD_SIZE}`
+    if [[ "${server_count}" == "" ]]; then
+      echo "server count is 0, train job failed." | tee -a hccl.log
+      chmod 440 ${output_url}
+      exit 1
+    fi
+fi
+
+
 
 # =============================================================================
 # Llama3.1 405B 4K Training Hyperparameters
@@ -32,9 +88,9 @@ MBS=1
 GBS=128
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $NPUS_PER_NODE \
-    --nnodes $NNODES \
-    --node_rank $NODE_RANK \
+    --nproc_per_node $LOCAL_WORLD_SIZE \
+    --nnodes $server_count \
+    --node_rank $RANK \
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
@@ -49,7 +105,7 @@ OPTIMIZE_ARGS="
     --use-cp-send-recv-overlap \
     --use-fused-ring-attention-update \
     --tp-2d \
-    --tp-x 4 \
+    --tp-x 2 \
     --tp-y 2 \
     --overlap-grad-reduce \
     --overlap-param-gather \
@@ -135,6 +191,7 @@ OUTPUT_ARGS="
     --log-throughput \
 "
 
+unset HIGH_AVAILABILITY
 
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $GPT_ARGS \
@@ -145,7 +202,8 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $CKPT_ARGS \
     $OUTPUT_ARGS \
     --distributed-backend nccl \
-    --transformer-impl local 2>&1 | & tee -a ${TRAIN_LOG_PATH}
+    --transformer-impl local \
+    | tee ${TRAIN_LOG_PATH}
 
 
 ST=${PIPESTATUS[0]}
