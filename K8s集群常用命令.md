@@ -14,6 +14,7 @@
   - [7. 故障排查与清理](#7-故障排查与清理)
     - [7.1 强制删除 API 对象 (Terminating 卡死)](#71-强制删除-api-对象-terminating-卡死)
     - [7.2 物理节点深度清理 (API 删除无效时)](#72-物理节点深度清理-api-删除无效时)
+    - [7.3 Ansible 批量清理 (多节点操作)](#73-ansible-批量清理-多节点操作)
   - [8. AscendJob 训练任务专用](#8-ascendjob-训练任务专用)
 
 
@@ -135,6 +136,16 @@ fuser -v /dev/davinci*
 
 # 强制杀掉残留的训练进程 (慎用 kill -9)
 ps -ef | grep python | grep <task-keyword> | awk '{print $2}' | xargs kill -9
+```
+
+### 7.3 Ansible 批量清理 (多节点操作)
+
+适用于多机集群的快速清理，无需逐个登录节点。
+
+```bash
+# 批量停止并删除包含特定关键字 (如 llama31) 的容器
+# 注意：需替换 inventory 文件名 (host-kuang73-74) 和 过滤关键字 (llama31)
+ansible -i host-kuang73-74 all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 ```
 
 ---
