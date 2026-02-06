@@ -23,14 +23,17 @@ export TTP_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/ttplogs/ttplog$XDL_IP-$RANK
 export TRAIN_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/trainlogs/$XDL_IP-$RANK      # 设置训练日志保存路径
 
 export HCCL_ASYNC_ERROR_HANDLING=0                 # 当HCCL_ASYNC_ERROR_HANDLING为0时，表示关闭watchdog功能。如果开启watchdog功能，可能会影响进程级恢复的正常使用。
+export HCCL_WHITELIST_DISABLE=1
 export GLOO_SOCKET_IFNAME=enp66s0f0               # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
 export HCCL_SOCKET_IFNAME=enp66s0f0               # 如任务yaml中配置hostNetwork为false，则设置为eth0
 export TTP_OT=360
-export HCCL_CONNECT_TIMEOUT=1800
+
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-export NPU_ASD_ENABLE=0
+export HCCL_CONNECT_TIMEOUT=3600
+export HCCL_BUFFSIZE=256
 export TASK_QUEUE_ENABLE=2
+export NPU_ASD_ENABLE=0
 
 
 # =============================================================================
@@ -77,13 +80,13 @@ fi
 # Llama3.1 405B 4K Training Hyperparameters
 # =============================================================================
 
-TP=4
+TP=16
 PP=8
 VPP=4
 CP=2
 CP_TYPE='megatron_cp_algo'
 NUM_LAYERS=128
-SEQ_LEN=4096
+SEQ_LEN=2048
 MBS=1
 GBS=128
 
@@ -105,7 +108,7 @@ OPTIMIZE_ARGS="
     --use-cp-send-recv-overlap \
     --use-fused-ring-attention-update \
     --tp-2d \
-    --tp-x 2 \
+    --tp-x 8 \
     --tp-y 2 \
     --overlap-grad-reduce \
     --overlap-param-gather \
@@ -190,7 +193,6 @@ OUTPUT_ARGS="
     --log-interval 1 \
     --log-throughput \
 "
-
 unset HIGH_AVAILABILITY
 
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
@@ -202,7 +204,6 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $CKPT_ARGS \
     $OUTPUT_ARGS \
     --distributed-backend nccl \
-    --transformer-impl local \
     | tee ${TRAIN_LOG_PATH}
 
 
