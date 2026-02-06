@@ -80,7 +80,7 @@ kubectl create namespace study-k8s
 **查询 (Query)**
 ```bash
 kubectl get ns
-# 输出: 
+# 输出:
 # NAME              STATUS   AGE
 # default           Active   10d
 # study-k8s         Active   5s

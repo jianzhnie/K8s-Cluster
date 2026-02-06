@@ -132,7 +132,7 @@ crictl ps | grep <keyword> | awk '{print $1}' | xargs crictl rm
 
 # 4. 终极手段：清理占用 NPU 的僵尸进程
 # 查找占用 Ascend NPU 设备 (/dev/davinci*) 的进程
-fuser -v /dev/davinci* 
+fuser -v /dev/davinci*
 
 # 强制杀掉残留的训练进程 (慎用 kill -9)
 ps -ef | grep python | grep <task-keyword> | awk '{print $2}' | xargs kill -9
@@ -164,7 +164,7 @@ Huawei Ascend 910B AI 训练任务 (MindX DL) 核心操作。
 **AscendJob 标准调试流程：**
 1. **提交任务**: `kubectl apply -f <yaml>`
 2. **监控启动**: `kubectl get pods -l job-name=<name> -w`
-3. **查看日志**: 
+3. **查看日志**:
    - Master 节点: `kubectl logs -f <name>-master-0`
    - Worker 节点: `kubectl logs -f <name>-worker-0`
 4. **故障排查**:

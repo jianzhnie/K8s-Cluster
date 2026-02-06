@@ -305,7 +305,7 @@ spec:
 #### 最佳实践
 - **ConfigMap**: 存储非敏感信息（配置文件、环境变量）。
 - **Secret**: 存储敏感信息（密码、证书）。使用 Base64 编码（注意：不是加密，生产建议配合 Vault 或 KMS）。
-- **挂载方式**: 
+- **挂载方式**:
   - 环境变量 (`envFrom`): 简单，但配置变更需重启 Pod。
   - Volume 挂载 (`volumeMounts`): 支持热更新 (Hot Reload)。
 
