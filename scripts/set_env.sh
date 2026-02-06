@@ -5,10 +5,10 @@ unset PYTHONPATH
 export HF_ENDPOINT=https://hf-mirror.com
 
 # conda
-source /home/fdd/workspace/miniconda3/bin/activate mindspeed_llm_0105
+source /mnt/yWXKUIzKaqvtk0rLm/model_train/miniconda3/bin/activate mindspeed_llm_0105
 
 # cann 相关环境
-install_path=/home/fdd/workspace/Ascend/CANN8.3.RC1
+install_path=/mnt/yWXKUIzKaqvtk0rLm/model_train/Ascend/CANN8.3.RC1
 source $install_path/ascend-toolkit/set_env.sh
 source $install_path/nnal/atb/set_env.sh
 
