@@ -95,8 +95,8 @@ spec:
                 - -c
               args:
                 - |
-                  cd /job/code; 
-                  chmod +x scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh; 
+                  cd /job/code;
+                  chmod +x scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh;
                   bash scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
