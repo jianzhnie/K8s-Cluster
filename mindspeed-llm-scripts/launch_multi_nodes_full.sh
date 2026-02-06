@@ -56,29 +56,29 @@ if [ ${#NODE_HOSTS[@]} -eq 0 ]; then
 fi
 
 # --- 训练相关参数，来自你原始脚本的配置 ---
-PROJECT_DIR="/home/fdd/workspace/projects/MindSpeed-LLM-0105"
-DATA_PATH="/home/fdd/workspace/datasets/nv_cc/pretrain_100B/part00_text_document"
-DATA_DIR="/home/fdd/workspace/datasets/nv_cc/pretrain_100B"
+PROJECT_DIR="/mnt/yWXKUIzKaqvtk0rLm/model_train/projects/MindSpeed-LLM-0105"
+DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/datasets/pretrain_100B/part00_text_document"
+DATA_DIR="/mnt/yWXKUIzKaqvtk0rLm/datasets/pretrain_100B"
 DATA_NAME_PATTERN="part*"
-TOKENIZER_PATH="/home/fdd/workspace/models/LLM-Research/Meta-Llama-3.1-405B"
+TOKENIZER_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/models/LLM-Research/Meta-Llama-3.1-405B"
 CKPT_LOAD_DIR=""
 
 # --- 分布式配置 ---
 MASTER_ADDR="${NODE_HOSTS[0]}"
 MASTER_PORT="29500"
 DEVICES_PER_NODE=8
-SSH_USER="fdd"
+SSH_USER="root"
 SSH_TIMEOUT=30
 
 # --- 远程脚本和日志配置 ---
 OUTPUT_DIR="$PROJECT_DIR/work_dir/llama31_405b_8k_A3_ptd_pcl"
-REMOTE_MAIN_SCRIPT="$PROJECT_DIR/pcl_scripts/launch_multi_nodes_full.sh"
-REMOTE_SCRIPT="$PROJECT_DIR/pcl_scripts/launch_single_node.sh"
+REMOTE_MAIN_SCRIPT="$PROJECT_DIR/mindspeed-llm-scripts/launch_multi_nodes_full.sh"
+REMOTE_SCRIPT="$PROJECT_DIR/mindspeed-llm-scripts/launch_single_node.sh"
 
 # TRAIN_SCRIPT="$PROJECT_DIR/scripts_qwen3-30b/exp6_pretrain_qwen3_30b_a3b_mla+128a8_1share_muon_pcl.sh"
 # TRAIN_SCRIPT="$PROJECT_DIR/scripts_qwen3-30b/exp7_pretrain_qwen3_30b_a3b_mla+128a8_1share_muon_mtp1_pcl.sh"
-# TRAIN_SCRIPT="$PROJECT_DIR/pcl_scripts/pretrain_deepseek3_671b_4k_A3_ptd_pcl.sh"
-TRAIN_SCRIPT="$PROJECT_DIR/pcl_scripts/pretrain_llama31_405b_8k_A3_ptd_pcl.sh"
+# TRAIN_SCRIPT="$PROJECT_DIR/mindspeed-llm-scripts/pretrain_deepseek3_671b_4k_A3_ptd_pcl.sh"
+TRAIN_SCRIPT="$PROJECT_DIR/mindspeed-llm-scripts/pretrain_llama31_405b_8k_A3_ptd_pcl.sh"
 
 
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
