@@ -82,7 +82,7 @@ else
       fi
       exit 1
     fi
-    
+
     # 获取环境变量中的 server_count 字段
     server_count=`expr ${WORLD_SIZE} / ${device_count}`
     if [[ "${server_count}" == "" ]]; then

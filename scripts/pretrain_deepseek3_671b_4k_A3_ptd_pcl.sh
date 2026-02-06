@@ -172,4 +172,4 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $MTP_ARGS \
     --save $CKPT_SAVE_DIR \
     --load $CKPT_LOAD_DIR \
-    --distributed-backend nccl 
+    --distributed-backend nccl

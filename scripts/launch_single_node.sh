@@ -82,4 +82,3 @@ exec bash $TRAIN_SCRIPT \
     "$DATA_PATH" \
     "$DATA_PREFIXES" \
     "$TOKENIZER_PATH"
-

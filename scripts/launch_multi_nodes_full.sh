@@ -105,7 +105,7 @@ trap cleanup INT TERM EXIT
 cleanup() {
     local -r exit_code=$?
     echo -e "\n⚠️  接收到中断信号或脚本退出，正在清理所有远程节点任务..."
-    
+
     if [ ${#PIDS[@]} -gt 0 ]; then
         echo "   -> 正在发送 SIGTERM 信号..."
         for pid in "${PIDS[@]}"; do
@@ -113,7 +113,7 @@ cleanup() {
                 kill "$pid" 2>/dev/null || true
             fi
         done
-        
+
         sleep 1.0 # 给1秒钟的优雅退出时间
 
         echo "   -> 正在检查并强制终止未退出的进程..."
@@ -203,7 +203,7 @@ launch_nodes() {
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=3 \
             "$SSH_USER@$node_host" "
-            
+
             # 这是在远程节点上执行的命令块
             set -euo pipefail;
             cd '$PROJECT_DIR' || exit 1;
@@ -214,21 +214,21 @@ launch_nodes() {
             export MASTER_ADDR='$MASTER_ADDR';
             export MASTER_PORT='$MASTER_PORT';
             export CKPT_LOAD_DIR='$CKPT_LOAD_DIR';
-            export CKPT_SAVE_DIR='$CKPT_SAVE_DIR';            
+            export CKPT_SAVE_DIR='$CKPT_SAVE_DIR';
             export DATA_PATH='$DATA_PATH';
             export DATA_PREFIXES='$DATA_PREFIXES';
             export TOKENIZER_PATH='$TOKENIZER_PATH';
             export LOG_DIR='$LOG_DIR';
             export PROJECT_DIR='$PROJECT_DIR'
             export TRAIN_SCRIPT='$TRAIN_SCRIPT'
-            
+
             # 加载环境变量
             set +u
             source set_env.sh
             # 使用 exec 确保远程脚本的退出码被正确传递
             exec nohup bash '$REMOTE_SCRIPT'
         " > "$log_file" 2>&1 &
-        
+
         PIDS+=($!)
         sleep 0.1
     done
@@ -284,10 +284,10 @@ prepare_data_prefixes() {
     for item in "${DATA_FILES_LIST[@]}"; do
         quoted_list+=("'$item'")
     done
-    
+
     # 2. 使用 IFS=, 将带引号的元素拼接
     local joined_items=$(IFS=,; echo "${quoted_list[*]}")
-    
+
     # 3. 直接赋值数组元素，不需要方括号
     DATA_PREFIXES="${DATA_FILES_LIST[*]}"
     echo "[INFO] 自动生成的数据集前缀列表 (Python List Format): $DATA_PREFIXES"
