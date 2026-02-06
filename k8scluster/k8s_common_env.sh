@@ -38,6 +38,7 @@ export TRAIN_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/trainlogs/$XDL_IP-$RANK
 # 2. Ascend & HCCL 基础配置
 # -----------------------------------------------------------------------------
 export HCCL_ASYNC_ERROR_HANDLING=0  # 0: 关闭 watchdog，避免影响进程级恢复
+export HCCL_WHITELIST_DISABLE=1
 
 # 网卡配置 (默认 enp66s0f0，可被外部环境变量覆盖)
 export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-enp66s0f0}
@@ -99,6 +100,7 @@ export server_count
 
 # 导出通用的变量名 (供 torchrun 使用)
 export NPROC_PER_NODE=$device_count
+export NPUS_PER_NODE=$device_count
 export NNODES=$server_count
 
 echo "Environment setup complete."
