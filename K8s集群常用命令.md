@@ -146,7 +146,10 @@ ps -ef | grep python | grep <task-keyword> | awk '{print $2}' | xargs kill -9
 # 批量停止并删除包含特定关键字 (如 llama31) 的容器
 # 注意：需替换 inventory 文件名 (host-kuang73-74) 和 过滤关键字 (llama31)
 ansible -i host-kuang73-74 all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
+
+ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 ```
+
 
 ---
 
