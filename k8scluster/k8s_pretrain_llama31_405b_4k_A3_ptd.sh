@@ -41,7 +41,8 @@ export NPU_ASD_ENABLE=0
 # =============================================================================
 
 CKPT_SAVE_DIR="/job/data/output/ckpt"
-DATA_PATH="/job/data/datasets/part00_text_document"
+# DATA_PATH="/job/data/datasets/part00_text_document"
+DATA_PATH="/job/data/datasets/alpaca/alpaca_text_document"
 TOKENIZER_PATH="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
 CKPT_LOAD_DIR="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
 
