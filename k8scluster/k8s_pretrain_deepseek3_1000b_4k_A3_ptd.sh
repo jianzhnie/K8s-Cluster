@@ -34,6 +34,7 @@ export HCCL_CONNECT_TIMEOUT=3600
 export HCCL_BUFFSIZE=256
 export TASK_QUEUE_ENABLE=2
 export NPU_ASD_ENABLE=0
+export STREAMS_PER_DEVICE=32
 
 
 # =============================================================================
@@ -82,7 +83,7 @@ fi
 # =============================================================================
 
 TP=2
-PP=16
+PP=8
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
