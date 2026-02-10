@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# Llama3.1 405B 4K Training Start Script
+# Llama3.1 405B 8K Training Start Script
 # 依赖 k8s_common_env.sh 进行基础环境初始化
 # =============================================================================
 
@@ -9,8 +9,8 @@
 # source $(dirname "$0")/k8s_common_env.sh
 source ~/.bashrc
 
-mkdir -p /job/code/alllogs/$MINDX_TASK_ID/ttplogs
-mkdir -p /job/code/alllogs/$MINDX_TASK_ID/trainlogs
+mkdir -p /job/code/alllogs/llama31_405b_8k/$MINDX_TASK_ID/ttplogs
+mkdir -p /job/code/alllogs/llama31_405b_8k/$MINDX_TASK_ID/trainlogs
 mkdir -p /job/data/output/ckpt
 
 # env for breakpoint ckpt
@@ -37,11 +37,11 @@ export NPU_ASD_ENABLE=0
 
 
 # =============================================================================
-# Llama3.1 405B 4K Training Paths
+# Llama3.1 405B 8K Training Paths
 # =============================================================================
 
 CKPT_SAVE_DIR="/job/data/output/ckpt"
-# DATA_PATH="/job/data/datasets/part00_text_document"
+DATA_PATH="/job/data/datasets/nv_cc/300B/part_000000_llama-3.1-tokenizer_text_document"
 DATA_PATH="/job/data/datasets/alpaca/alpaca_text_document"
 TOKENIZER_PATH="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
 CKPT_LOAD_DIR="/job/data/models/LLM-Research/Meta-Llama-3.1-405B"
@@ -78,16 +78,16 @@ fi
 
 
 # =============================================================================
-# Llama3.1 405B 4K Training Hyperparameters
+# Llama3.1 405B 8K Training Hyperparameters
 # =============================================================================
 
 TP=16
 PP=8
-VPP=4
+VPP=1
 CP=2
 CP_TYPE='megatron_cp_algo'
 NUM_LAYERS=128
-SEQ_LEN=2048
+SEQ_LEN=8192
 MBS=1
 GBS=128
 
@@ -98,6 +98,7 @@ DISTRIBUTED_ARGS="
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
+
 
 OPTIMIZE_ARGS="
     --use-flash-attn \
@@ -118,9 +119,8 @@ OPTIMIZE_ARGS="
 MODEL_PARALLEL_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
-    --num-layers-per-virtual-pipeline-stage ${VPP} \
     --context-parallel-size ${CP} \
-    --context-parallel-algo megatron_cp_algo \
+    --context-parallel-algo ${CP_TYPE} \
 "
 
 GPT_ARGS="

@@ -9,8 +9,8 @@
 # source $(dirname "$0")/k8s_common_env.sh
 source ~/.bashrc
 
-mkdir -p /job/code/alllogs/$MINDX_TASK_ID/ttplogs
-mkdir -p /job/code/alllogs/$MINDX_TASK_ID/trainlogs
+mkdir -p /job/code/alllogs/deepseek3_671b_4k/$MINDX_TASK_ID/ttplogs
+mkdir -p /job/code/alllogs/deepseek3_671b_4k/$MINDX_TASK_ID/trainlogs
 mkdir -p /job/data/output/ckpt
 
 # env for breakpoint ckpt
@@ -37,12 +37,12 @@ export NPU_ASD_ENABLE=0
 
 
 # =============================================================================
-# Llama3.1 405B 4K Training Paths
+# Deepseek3 671B 4K Training Paths
 # =============================================================================
 
 CKPT_SAVE_DIR="/job/data/output/ckpt"
-# DATA_PATH="/job/data/datasets/part00_text_document"
-DATA_PATH="/job/data/datasets/alpaca/alpaca_text_document"
+DATA_PATH="/job/data/datasets/nv_cc/300B/part_000000_deepseek32_671b_text_document"
+# DATA_PATH="/job/data/datasets/alpaca/alpaca_text_document"
 TOKENIZER_PATH="/job/data/models/deepseek-ai/DeepSeek-V3-Base"
 CKPT_LOAD_DIR="/job/data/models/deepseek-ai/DeepSeek-V3-Base"
 
@@ -233,6 +233,7 @@ DATA_ARGS="
 
 OUTPUT_ARGS="
     --log-interval 1 \
+    --log-throughput \
     --save-interval 2000 \
     --eval-interval 2000 \
     --eval-iters 0 \
