@@ -148,6 +148,8 @@ ps -ef | grep python | grep <task-keyword> | awk '{print $2}' | xargs kill -9
 ansible -i host-kuang73-74 all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 
 ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
+
+ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep deepseek | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 ```
 
 

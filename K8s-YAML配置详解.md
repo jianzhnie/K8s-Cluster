@@ -570,6 +570,61 @@ resources:
 
 ---
 
+
+### 6.3 超节点亲和性调度 (Super-Node Affinity)
+
+**1. 目标**
+
+对于大规模分布式训练任务（如 LLM 训练），Pod 间的通信效率至关重要。为了最小化网络延迟、最大化训练性能（尤其是张量并行 `TP` 和流水线并行 `PP` 的效率），我们希望将同一个训练任务的所有 Pod 尽可能地调度到同一个“超节点”内。
+
+“超节点”是一个逻辑概念，指由多台通过高速网络（如 RoCE）紧密互联的物理服务器组成的计算集群。将 Pod 调度到同一超节点，可以确保跨 Pod 通信完全利用高速网络，避免普通 TCP/IP 网络带来的性能瓶颈。
+
+**2. 实现机制**
+
+Volcano 调度器提供了超节点亲和性功能，允许将一组 Pod（一个 `PodGroup`）作为一个原子单位进行调度。通过在 `PodGroup` 资源中添加一个特定的 Annotation `volcano.sh/sp-block`，可以强制调度器将该任务的所有 Pod 调度到单一的、资源充足的超节点上。
+
+**3. 配置方法**
+
+`volcano.sh/sp-block` Annotation 的值需要精确设置为该任务所请求的 **NPU 总量**。
+
+*   **计算公式**: `Value = (任务的 Pod 总数) x (每个 Pod 使用的 NPU 数量)`
+
+**4. 配置示例**
+
+假设一个训练任务包含 **4 个 Pod**，每个 Pod 请求 **8 个 NPU** (如华为昇腾 910)。
+
+1.  **计算 NPU 总量**: `4 pods * 8 NPU/pod = 32`
+2.  **配置 Annotation**: 在 `PodGroup` 的 `metadata.annotations` 中设置 `volcano.sh/sp-block: "32"`。
+
+**YAML 示例**:
+
+```yaml
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: PodGroup
+metadata:
+  name: my-distributed-training-job
+  namespace: default
+  annotations:
+    # 关键配置：启用超节点亲和性调度
+    # 值等于任务所需的 NPU 总量 (4 pods * 8 npu/pod = 32)
+    volcano.sh/sp-block: "32"
+spec:
+  # 任务包含的 Pod 总数，必须与计算 sp-block 值时使用的 Pod 数一致
+  minMember: 4
+  minResources:
+    # 定义每个 Pod 的最小资源，确保调度器能正确计算
+    cpu: "32"
+    memory: "256Gi"
+    huawei.com/Ascend910: "8"
+```
+
+**5. 注意事项**
+
+*   **精确匹配**: `volcano.sh/sp-block` 的值必须与 `spec.minMember` 和每个 Pod 的 NPU 请求量精确匹配，否则可能导致调度失败。
+*   **功能确认**: 使用此特性前，请确认当前环境部署的 Volcano 版本支持超节点调度功能。
+*   **命名可能变化**: `sp-block` 这个名称和具体的 Annotation Key (`volcano.sh/sp-block`) 可能会因 Volcano 的版本或您所在平台的定制化部署而异，请以实际环境为准。
+
+
 ## 7. 进阶指导：配置多机多卡分布式训练
 
 在实际的大模型训练中，单机 8 卡往往无法满足显存和算力需求，需要进行多机多卡（Distributed Training）配置。以下是基于上述 YAML 进行多机扩展的步骤（以 **双机 16 卡** 为例）。
