@@ -89,7 +89,7 @@ CP_TYPE='megatron_cp_algo'
 NUM_LAYERS=128
 SEQ_LEN=8192
 MBS=1
-GBS=128
+GBS=2048
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
