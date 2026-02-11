@@ -83,21 +83,21 @@ fi
 
 
 TP=2
-PP=1
-EP=4
+PP=16
+EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=61
-SEQ_LEN=4096
+NUM_LAYERS=64
+SEQ_LEN=1024
 MBS=1
 GBS=1024
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $NPUS_PER_NODE \
-    --nnodes $NNODES \
+    --nproc_per_node $LOCAL_WORLD_SIZE \
+    --nnodes $server_count \
+    --node_rank $RANK \
     --master_addr $MASTER_ADDR \
-    --master_port $MASTER_PORT \
-    --node_rank $NODE_RANK
+    --master_port $MASTER_PORT
 "
 
 MLA_ARGS="
@@ -113,7 +113,7 @@ MLA_ARGS="
 
 MOE_ARGS="
     --moe-grouped-gemm \
-    --moe-token-dispatcher-type alltoall \
+    --moe-token-dispatcher-type alltoall_seq \
     --use-fused-moe-token-permute-and-unpermute \
     --moe-permutation-async-comm \
     --moe-alltoall-overlap-comm \
@@ -166,7 +166,7 @@ GPT_ARGS="
     --ffn-hidden-size 18432 \
     --num-attention-heads 64 \
     --tokenizer-type PretrainedFromHF  \
-    --tokenizer-name-or-path ${TOKENIZER_MODEL} \
+    --tokenizer-name-or-path ${TOKENIZER_PATH} \
     --seq-length ${SEQ_LEN} \
     --max-position-embeddings 131072 \
     --micro-batch-size ${MBS} \
@@ -216,12 +216,15 @@ DATA_ARGS="
 
 OUTPUT_ARGS="
     --log-interval 1 \
+    --log-throughput \
     --save-interval 2000 \
     --eval-interval 2000 \
     --eval-iters 0 \
     --no-save-optim \
     --no-save-rng \
 "
+
+unset HIGH_AVAILABILITY
 
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $GPT_ARGS \
@@ -231,7 +234,10 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $OUTPUT_ARGS \
     $DATA_ARGS \
     --distributed-backend nccl \
-    --save $CKPT_SAVE_DIR \
-    --load $CKPT_LOAD_DIR \
-    --transformer-impl local \
-    | tee logs/pretrain_kimi2_18b_4k_ptd.log
+    | tee ${TRAIN_LOG_PATH}
+
+ST=${PIPESTATUS[0]}
+if [[ ${ST} -ne 0 ]]; then
+       logger "running job failed. exit code: ${ST}" | tee -a ${output_url}/log
+      exit ${ST}
+fi
