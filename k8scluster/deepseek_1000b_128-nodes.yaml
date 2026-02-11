@@ -26,7 +26,7 @@ metadata:
     process-recover-enable: "on" # 开启训练进程级恢复
     subHealthyStrategy: "ignore" # 忽略亚健康
   annotations:
-    sp-block: "8"
+    sp-block: "128"
     huawei.com/schedule_policy: chip2-node8-sp
     wait-reschedule-timeout: "270" # 进程级恢复等待故障节点重调度的超时时间，默认270秒，取值范围30-270。进程级恢复和弹性训练均开启时，则等待此时间后若故障节点调度成功，则进行进程级恢复，否则触发弹性训练
     recover-strategy: "retry,recover,dump,exit,elastic-training" # 开启step重计算、进程级恢复、临终遗言、进程退出和弹性训练
@@ -34,7 +34,7 @@ spec:
   schedulerName: volcano # work when enableGangScheduling is true
   runPolicy:
     schedulingPolicy: # work when enableGangScheduling is true
-      minAvailable: 8
+      minAvailable: 16
       queue: default
   successPolicy: AllWorkers
   replicaSpecs:
