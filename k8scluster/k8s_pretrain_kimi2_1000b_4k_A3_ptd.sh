@@ -30,9 +30,10 @@ export TTP_OT=360
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export HCCL_CONNECT_TIMEOUT=3600
 export HCCL_BUFFSIZE=256
-export TASK_QUEUE_ENABLE=2
+export TASK_QUEUE_ENABLE=1
 export NPU_ASD_ENABLE=0
 export STREAMS_PER_DEVICE=32
 
@@ -83,12 +84,12 @@ fi
 
 
 TP=2
-PP=16
+PP=8
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
 NUM_LAYERS=64
-SEQ_LEN=1024
+SEQ_LEN=2048
 MBS=1
 GBS=1024
 
@@ -122,10 +123,11 @@ MOE_ARGS="
     --n-shared-experts 1 \
     --num-experts 384 \
     --moe-router-topk 8 \
+    --moe-ffn-hidden-size 2048 \
     --moe-router-load-balancing-type none \
     --moe-router-num-groups 1 \
     --moe-router-topk-scaling-factor 2.827 \
-    --moe-aux-loss-coeff 0.0001 \
+    --moe-aux-loss-coeff 0.001 \
     --seq-aux \
     --norm-topk-prob \
     --moe-router-score-function sigmoid \
