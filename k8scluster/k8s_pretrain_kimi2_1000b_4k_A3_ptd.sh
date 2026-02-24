@@ -88,7 +88,7 @@ PP=8
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=61
+NUM_LAYERS=64
 SEQ_LEN=4096
 MBS=1
 GBS=1024
@@ -161,7 +161,7 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
-    --num-layer-list 8,8,8,8,8,7,7,7  \
+    --noop-layers 61,62,63 \
     --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
