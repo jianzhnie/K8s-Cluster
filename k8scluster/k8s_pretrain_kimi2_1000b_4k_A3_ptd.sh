@@ -88,10 +88,12 @@ PP=8
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=64
-SEQ_LEN=2048
+NUM_LAYERS=61
+SEQ_LEN=4096
 MBS=1
 GBS=1024
+TRAIN_ITERS=20000
+SAVE_ITERS=2000
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
@@ -114,7 +116,7 @@ MLA_ARGS="
 
 MOE_ARGS="
     --moe-grouped-gemm \
-    --moe-token-dispatcher-type alltoall_seq \
+    --moe-token-dispatcher-type alltoall \
     --use-fused-moe-token-permute-and-unpermute \
     --moe-permutation-async-comm \
     --moe-alltoall-overlap-comm \
@@ -133,7 +135,7 @@ MOE_ARGS="
     --moe-router-score-function sigmoid \
     --moe-router-enable-expert-bias \
     --moe-router-dtype fp32 \
-    --moe-tp-extend-ep \
+    --moe-shared-expert-overlap
 "
 
 ROPE_ARGS="
@@ -159,6 +161,7 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --num-layer-list 8,8,8,8,8,7,7,7  \
     --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
@@ -175,7 +178,7 @@ GPT_ARGS="
     --global-batch-size ${GBS} \
     --make-vocab-size-divisible-by 1 \
     --lr 1.0e-5 \
-    --train-iters 2000 \
+    --train-iters $TRAIN_ITERS \
     --lr-decay-style cosine \
     --untie-embeddings-and-output-weights \
     --use-fused-rotary-pos-emb \
@@ -219,8 +222,8 @@ DATA_ARGS="
 OUTPUT_ARGS="
     --log-interval 1 \
     --log-throughput \
-    --save-interval 2000 \
-    --eval-interval 2000 \
+    --save-interval $SAVE_ITERS \
+    --eval-interval $TRAIN_ITERS \
     --eval-iters 0 \
     --no-save-optim \
     --no-save-rng \
@@ -236,10 +239,4 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $OUTPUT_ARGS \
     $DATA_ARGS \
     --distributed-backend nccl \
-    | tee ${TRAIN_LOG_PATH}
-
-ST=${PIPESTATUS[0]}
-if [[ ${ST} -ne 0 ]]; then
-       logger "running job failed. exit code: ${ST}" | tee -a ${output_url}/log
-      exit ${ST}
-fi
+    2>&1 | tee ${TRAIN_LOG_PATH}
