@@ -7,6 +7,7 @@
   - [目录](#目录)
   - [1. 基础配置与环境](#1-基础配置与环境)
   - [2. 集群与节点管理](#2-集群与节点管理)
+    - [标记坏节点并禁止调度](#标记坏节点并禁止调度)
   - [3. Pod 与容器管理](#3-pod-与容器管理)
   - [4. 工作负载 (Deployments/Jobs)](#4-工作负载-deploymentsjobs)
   - [5. 网络与服务](#5-网络与服务)
@@ -49,6 +50,110 @@
 | `kubectl cordon <node>`         | **禁止调度** (维护模式)         | `kubectl cordon bms1889`                    |
 | `kubectl uncordon <node>`       | 恢复调度                        | `kubectl uncordon bms1889`                  |
 | `kubectl drain <node>`          | 驱逐节点上的 Pod (维护前清空)   | `kubectl drain bms1889 --ignore-daemonsets` |
+
+### 标记坏节点并禁止调度
+
+典型需求：某些节点硬件或环境有问题，希望调度时自动避开。
+
+**1. 最简单：直接停止在该节点上调度（不改 Pod 配置）**
+
+- 只禁止新 Pod 调度到该节点：
+  ```bash
+  kubectl cordon <node-name>
+  ```
+  之后调度器不会再把新 Pod 放到这个节点上，但现有 Pod 还会继续跑。
+
+- 禁止调度 + 迁走现有 Pod：
+  ```bash
+  kubectl drain <node-name> \
+    --ignore-daemonsets \
+    --delete-emptydir-data
+  ```
+  这会把除 DaemonSet 以外的 Pod 都驱逐到其他节点，并且将节点标记为不可调度（内部等价于 cordon）。
+
+这种方式不需要改 Pod 的 YAML，适合“节点坏了先不用”的场景。
+
+**2. 更“语义化”的方式：给节点打标签 + 污点（推荐）**
+
+仅仅“打标签”本身**不会**阻止调度器调度过去，除非你在 Pod 里用 `nodeSelector`/`nodeAffinity` 去“避开”这些标签；这需要改所有工作负载的配置，比较麻烦。
+
+更推荐用 **污点（taint）** 标记坏节点，这样调度器就不会再把普通 Pod 调度过去：
+
+- 给节点加一个“坏节点”的污点，只禁止新 Pod 调度：
+  ```bash
+  kubectl taint nodes <node-name> node-status=bad:NoSchedule
+  ```
+
+- 如果既想阻止新 Pod，又想把现有 Pod 也赶走（类似 drain 效果）：
+  ```bash
+  kubectl taint nodes <node-name> node-status=bad:NoExecute
+  ```
+  或者同时：
+  ```bash
+  kubectl taint nodes <node-name> node-status=bad:NoSchedule,node-status=bad:NoExecute
+  ```
+
+- 之后，如果有极少数“特殊 Pod”（比如监控、日志采集）仍然需要落到这些坏节点上，可以在 Pod 里加 **tolerations** 来容忍这个污点，例如：
+  ```yaml
+  tolerations:
+    - key: "node-status"
+      operator: "Equal"
+      value: "bad"
+      effect: "NoSchedule"
+  ```
+
+- 想恢复节点时，去掉污点即可：
+  ```bash
+  kubectl taint nodes <node-name> node-status-
+  ```
+
+
+```bash
+kubectl label node <node-name> node-status=bad
+```
+
+```yaml
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-status
+              operator: NotIn
+              values: ["bad"]
+```
+
+
+**3. 如果你坚持用“标签”来区分坏节点**
+
+这种方式需要你在所有业务 Pod 的调度策略里“显式避开”坏节点：
+
+- 给坏节点打标签：
+  ```bash
+  kubectl label nodes <node-name> node-status=bad
+  ```
+
+- 在 Pod/Deployment 里用 `nodeAffinity` 避开它们，例如只允许调度到 `node-status != bad` 的节点：
+  ```yaml
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-status
+                operator: NotIn
+                values: ["bad"]
+  ```
+
+但这需要你所有工作负载都遵守这个约束，否则仍然可能调度到坏节点。所以**集群层面一般用 taint 更合适**。
+
+
+**总结建议**
+
+- 想快速停用某个节点：用 `kubectl cordon` / `kubectl drain`。
+- 想长期标记“坏节点”，让调度器默认避开：对该节点加 **污点 taint**，如
+  `kubectl taint nodes <node> node-status=bad:NoSchedule`。
+- 只有当你有统一的 Pod 模板和 CI/CD，可以批量改 Pod 的 affinity 时，才考虑用**标签 + nodeAffinity** 方案。
 
 ---
 
@@ -150,6 +255,8 @@ ansible -i host-kuang73-74 all -m shell -a 'bash -c "crictl ps -a | grep llama31
 ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep llama31 | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 
 ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep deepseek | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
+
+ansible -i host-train-1024npu all -m shell -a 'bash -c "crictl ps -a | grep kimi | awk \"{print \$1}\" | xargs -I {} crictl stop {} && crictl rm {}"'
 ```
 
 
