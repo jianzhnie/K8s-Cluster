@@ -21,7 +21,6 @@ export ASCEND_GLOBAL_LOG_LEVEL=2                                                
 export ASCEND_PROCESS_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/plogs/$XDL_IP       # 设置plog保存路径，其中$MINDX_TASK_ID为ascend-operator注入的任务uid环境变量，$XDL_IP为任务yaml中写入的环境变量，status.hostIP
 export TTP_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/ttplogs/ttplog$XDL_IP-$RANK    # 设置ttp日志保存路径，其中$RANK为ascend-operator为pytorch框架注入的环境变量
 export TRAIN_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/trainlogs/$XDL_IP-$RANK      # 设置训练日志保存路径
-
 export HCCL_ASYNC_ERROR_HANDLING=0                 # 当HCCL_ASYNC_ERROR_HANDLING为0时，表示关闭watchdog功能。如果开启watchdog功能，可能会影响进程级恢复的正常使用。
 export HCCL_WHITELIST_DISABLE=1
 export GLOO_SOCKET_IFNAME=enp66s0f0               # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
@@ -29,13 +28,14 @@ export HCCL_SOCKET_IFNAME=enp66s0f0               # 如任务yaml中配置hostNe
 export TTP_OT=360
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export CPU_AFFINITY_CONF=1
+export TASK_QUEUE_ENABLE=2
+export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
 export HCCL_CONNECT_TIMEOUT=3600
-export HCCL_BUFFSIZE=256
-export TASK_QUEUE_ENABLE=1
-export NPU_ASD_ENABLE=0
+export HCCL_BUFFSIZE=400
 export STREAMS_PER_DEVICE=32
+export HCCL_OP_BASE_FFTS_MODE=TRUE
+export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 
 
 # =============================================================================
@@ -114,6 +114,7 @@ MLA_ARGS="
     --kv-lora-rank 512 \
     --v-head-dim 128 \
     --qk-layernorm \
+    --mla-mm-split \
     --mla-fa-without-pad \
 "
 
@@ -123,6 +124,7 @@ MOE_ARGS="
     --use-fused-moe-token-permute-and-unpermute \
     --moe-permutation-async-comm \
     --moe-alltoall-overlap-comm \
+    --moe-permute-fusion \
     --first-k-dense-replace 1 \
     --moe-layer-freq 1 \
     --n-shared-experts 1 \
@@ -138,7 +140,7 @@ MOE_ARGS="
     --moe-router-score-function sigmoid \
     --moe-router-enable-expert-bias \
     --moe-router-dtype fp32 \
-    --moe-shared-expert-overlap
+    --moe-tp-extend-ep \
 "
 
 ROPE_ARGS="
@@ -151,12 +153,35 @@ ROPE_ARGS="
     --rope-scaling-type yarn
 "
 
-GPT_ARGS="
-    --spec mindspeed_llm.tasks.models.spec.deepseek_spec layer_spec \
-    --gemm-gradient-accumulation-fusion \
+MTP_ARGS="
+    --mtp-num-layers 1 \
+    --mtp-loss-scaling-factor 0.3 \
+    --mtp-mem-efficient-logits \
+"
+
+DUALPIPE_ARGS="
+    --moe-fb-overlap \
+    --schedules-method dualpipev \
+"
+
+MEM_ARGS="
+    --swap-optimizer \
     --recompute-granularity full \
-    --recompute-method uniform \
-    --recompute-num-layers 1 \
+    --recompute-method block \
+    --recompute-num-layers 8 \
+"
+
+GPT_ARGS="
+    --transformer-impl local \
+    --spec mindspeed_llm.tasks.models.spec.deepseek_spec layer_spec \
+    --reset-attention-mask \
+    --manual-gc \
+    --manual-gc-interval 50 \
+    --gemm-gradient-accumulation-fusion \
+    --overlap-grad-reduce \
+    --overlap-param-gather \
+    --dataloader-num-workers 4 \
+    --o2-optimizer \
     --no-shared-storage \
     --use-distributed-optimizer \
     --reuse-fp32-param \
@@ -210,6 +235,8 @@ GPT_ARGS="
     --rotary-base 50000 \
     --norm-epsilon 1e-6 \
     --bf16 \
+    --use-ascend-coc \
+    --coc-fused-kernel \
     --distributed-timeout-minutes 120 \
 "
 
@@ -243,6 +270,8 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $MLA_ARGS \
     $ROPE_ARGS \
     $MOE_ARGS \
+    $MTP_ARGS \
+    $DUALPIPE_ARGS \
     $OUTPUT_ARGS \
     $DATA_ARGS \
     $CKPT_ARGS \
