@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: reset-config-robin-kimi2-1000b-256-nodes # The value of JobName must be the same as the name attribute of the following job. The prefix fault-config- cannot be modified.
+  name: reset-config-robin-kimi2-1t-256-nodes # The value of JobName must be the same as the name attribute of the following job. The prefix fault-config- cannot be modified.
   namespace: default # Name Space must be set to "default"
   labels:
     reset: "true"
@@ -15,7 +15,7 @@ data:
 apiVersion: mindxdl.gitee.com/v1
 kind: AscendJob
 metadata:
-  name: robin-kimi2-1000b-256-nodes
+  name: robin-kimi2-1t-256-nodes
   labels:
     framework: pytorch
     ring-controller.atlas: ascend-910b
@@ -56,7 +56,7 @@ spec:
                       - key: job-name
                         operator: In
                         values:
-                          - robin-kimi2-1000b-256-nodes
+                          - robin-kimi2-1t-256-nodes
                   topologyKey: kubernetes.io/hostname
           nodeSelector:
             # ascend/train.nums: "1024"
@@ -129,7 +129,7 @@ spec:
           volumes:
             - name: reset-config
               hostPath:
-                path: /user/restore/reset/default.reset-config-robin-kimi2-1000b-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
+                path: /user/restore/reset/default.reset-config-robin-kimi2-1t-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
                 path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/QWEN3_for_PyTorch_2.7_code
@@ -147,7 +147,7 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-kimi2-1000b-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-kimi2-1t-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory
     Worker:
       replicas: 255
@@ -167,7 +167,7 @@ spec:
                       - key: job-name
                         operator: In
                         values:
-                          - robin-kimi2-1000b-256-nodes
+                          - robin-kimi2-1t-256-nodes
                   topologyKey: kubernetes.io/hostname
           nodeSelector:
             # ascend/train.nums: "1024"
@@ -240,7 +240,7 @@ spec:
           volumes:
             - name: reset-config
               hostPath:
-                path: /user/restore/reset/default.reset-config-robin-kimi2-1000b-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
+                path: /user/restore/reset/default.reset-config-robin-kimi2-1t-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
                 path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/QWEN3_for_PyTorch_2.7_code
@@ -258,5 +258,5 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-kimi2-1000b-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-kimi2-1t-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory

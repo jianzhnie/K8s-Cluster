@@ -206,10 +206,6 @@ GPT_ARGS="
     --padded-vocab-size 163840 \
     --rotary-base 50000 \
     --norm-epsilon 1e-6 \
-    --no-load-optim \
-    --no-load-rng \
-    --no-save-rng \
-    --no-save-optim \
     --bf16 \
     --distributed-timeout-minutes 120 \
 "
@@ -219,14 +215,22 @@ DATA_ARGS="
     --split 100,0,0 \
 "
 
+CKPT_ARGS="
+    --no-load-optim \
+    --no-load-rng \
+    --no-save-optim \
+    --no-save-rng \
+    --seed 1234 \
+    --load ${CKPT_LOAD_DIR} \
+    --save ${CKPT_SAVE_DIR} \
+"
+
 OUTPUT_ARGS="
     --log-interval 1 \
     --log-throughput \
     --save-interval $SAVE_ITERS \
     --eval-interval $TRAIN_ITERS \
     --eval-iters 0 \
-    --no-save-optim \
-    --no-save-rng \
 "
 
 unset HIGH_AVAILABILITY
@@ -238,5 +242,6 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $MOE_ARGS \
     $OUTPUT_ARGS \
     $DATA_ARGS \
+    $CKPT_ARGS \
     --distributed-backend nccl \
     2>&1 | tee ${TRAIN_LOG_PATH}
