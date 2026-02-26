@@ -17,7 +17,7 @@ fi
 # 3. Consolidated mounts where possible (kept originals for safety if symlinks exist)
 # 4. Added conflict check above
 
-docker run --rm \
+docker run -d \
     -u root \
     --name ${CONTAINER_NAME} \
     --ipc=host \
@@ -46,4 +46,4 @@ docker run --rm \
     -v /root/.cache:/root/.cache \
     -v /home/niejzh:/home/niejzh:rw \
     -it ${IMAGE_NAME} \
-    /bin/bash
+    /bin/bash -c "while true; do sleep 1000; done"
