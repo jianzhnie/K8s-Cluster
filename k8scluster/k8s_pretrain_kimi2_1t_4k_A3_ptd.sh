@@ -96,7 +96,7 @@ SEQ_LEN=4096
 MBS=1
 GBS=1024
 TRAIN_ITERS=20000
-SAVE_ITERS=2000
+SAVE_ITERS=10
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
@@ -221,8 +221,6 @@ DATA_ARGS="
 CKPT_ARGS="
     --no-load-optim \
     --no-load-rng \
-    --no-save-optim \
-    --no-save-rng \
     --seed 1234 \
     --load ${CKPT_LOAD_DIR} \
     --save ${CKPT_SAVE_DIR} \
