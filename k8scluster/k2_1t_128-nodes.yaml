@@ -96,8 +96,8 @@ spec:
               args:
                 - |
                   cd /job/code;
-                  chmod +x scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh
+                  chmod +x scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh;
+                  bash scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -207,8 +207,8 @@ spec:
               args:
                 - |
                   cd /job/code;
-                  chmod +x scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh
+                  chmod +x scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh;
+                  bash scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
