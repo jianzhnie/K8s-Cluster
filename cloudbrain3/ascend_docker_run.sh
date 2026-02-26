@@ -44,6 +44,6 @@ docker run -d \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /root/.cache:/root/.cache \
-    -v /home/niejzh:/home/niejzh:rw \
+    -v /mnt/9w1N7vBPmO3wMAYjqZL/robin:/home/robin:rw \
     -it ${IMAGE_NAME} \
     /bin/bash -c "while true; do sleep 1000; done"
