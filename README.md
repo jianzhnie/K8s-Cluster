@@ -19,3 +19,21 @@
 - 针对 Ascend 910B 芯片在 K8s 环境下的深度学习训练指南。
 - 详细讲解单机多卡与多机多卡训练配置（AscendJob）。
 - 包含故障自愈（Volcano + MindX DL）及核心参数解析。
+
+## 4. K8s YAML 配置详解
+**文件：** [tutorial/K8s-YAML配置详解.md](tutorial/K8s-YAML配置详解.md)
+- 详细解释 K8s 中常用的 YAML 配置文件。
+- 包括 Deployment, Service, Volume, ConfigMap, Secret 等核心组件的配置。
+- 适合进阶开发者或系统管理员学习 K8s 配置。
+
+## 5. K8s 集群扩容与维护
+**文件：** [tutorial/K8s集群扩容.md](tutorial/K8s集群扩容.md)
+- 详细讲解 K8s 集群节点扩容操作。
+- 包括添加新节点、配置网络路由、挂载目录等步骤。
+- 适合系统管理员或运维人员进行集群维护。
+
+
+## 其他帮助文档
+**文件：** [helper.md](helper.md)
+- 包含 rsync 等常用工具的使用说明。
+- 适合需要频繁操作文件传输的开发者。
