@@ -7,7 +7,7 @@ set -e
 # =============================================================================
 
 # 建议：生产环境脚本避免依赖 ~/.bashrc，以保证环境一致性
-# source ~/.bashrc
+source ~/.bashrc
 
 # -----------------------------------------------------------------------------
 # 1. 基础变量检查与设置
@@ -22,15 +22,11 @@ OUTPUT_DIR="/job/data/output"
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
+STRART_SCRIPT="/job/code/script/${SCRIPT_NAME}"
 
 # 日志与Checkpoint目录配置
-LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${DATETIME}_${MINDX_TASK_ID}"
+LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${DATETIME}/${MINDX_TASK_ID}"
 CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
-
-# 定义具体的日志路径
-export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
-export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
-export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
 
 # Rank 0 负责创建目录并备份脚本
 if [[ "${RANK}" -eq 0 ]]; then 
@@ -40,18 +36,36 @@ if [[ "${RANK}" -eq 0 ]]; then
     mkdir -p "$LOG_DIR/trainlogs"
     mkdir -p "$CKPT_SAVE_DIR"
     
-    cp "$0" "$LOG_DIR/"
+    # Try to copy the script file to the log directory
+    if [[ -f "$0" ]]; then
+        cp "$0" "$LOG_DIR/"
+    else
+        echo "Warning: Could not find script file at $0 to copy, try to copy $STRART_SCRIPT instead."
+        cp "$STRART_SCRIPT" "$LOG_DIR/"
+    fi
     printenv > "$LOG_DIR/env_vars.sh"
 else
-    # 其他节点稍作等待，确保目录已创建（建议配合共享存储或确保最终一致性）
-    sleep 6s
+    # 其他节点等待 Rank 0 创建目录 (Wait until directory exists)
+    echo "Waiting for directory initialization..."
+    for i in {1..10}; do
+        if [[ -d "$LOG_DIR/trainlogs" ]]; then
+            echo "Directory found."
+            break
+        fi
+        sleep 6
+    done
 fi
+
+# 定义具体的日志路径
+export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
+export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
+export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
 
 # -----------------------------------------------------------------------------
 # 2. 训练环境与网络配置
 # -----------------------------------------------------------------------------
 export RESUME_MODE_ENABLE=1
-export ASCEND_GLOBAL_LOG_LEVEL=2
+export ASCEND_GLOBAL_LOG_LEVEL=3
 export HCCL_ASYNC_ERROR_HANDLING=0
 export HCCL_WHITELIST_DISABLE=1
 export GLOO_SOCKET_IFNAME=enp66s0f0                # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
@@ -79,7 +93,6 @@ HF_CKPT_SAVE_DIR="/job/data/output/ckpt/hf"
 DATA_PATH="/job/data/datasets/nv_cc/300B/part_000000_deepseek32_671b_text_document"
 TOKENIZER_PATH="/job/data/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR="/job/data/models/moonshotai/Kimi-K2-Base"
-
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
   export TTP_ADDR=$POD_IP
@@ -125,8 +138,8 @@ NUM_LAYERS=64
 SEQ_LEN=4096
 MBS=1
 GBS=1024
-TRAIN_ITERS=20000
-SAVE_ITERS=10
+TRAIN_ITERS=20
+SAVE_ITERS=20
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
