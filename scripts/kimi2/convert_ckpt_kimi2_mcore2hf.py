@@ -98,6 +98,9 @@ class MgCkptConvert(object):
         self.v_head_dim = V_HEAD_DIM
         self.mtp_layer_number = MTP_LAYER_INDEX
 
+        self.inv_freq = 1.0 / (10000**(torch.arange(
+            0, self.qk_pos_emb_head_dim, 2).float() / self.qk_pos_emb_head_dim))
+            
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
         self.lora_target_modules = lora_target_modules
