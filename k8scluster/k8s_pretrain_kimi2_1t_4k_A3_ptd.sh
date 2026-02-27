@@ -1,55 +1,85 @@
 #!/bin/bash
+set -e
 
 # =============================================================================
 # Kimi2 1000B 4K Training Start Script
 # 依赖 k8s_common_env.sh 进行基础环境初始化
 # =============================================================================
 
-# 引用公共环境脚本
-# source $(dirname "$0")/k8s_common_env.sh
-source ~/.bashrc
+# 建议：生产环境脚本避免依赖 ~/.bashrc，以保证环境一致性
+# source ~/.bashrc
 
-mkdir -p /job/code/alllogs/kimi2_1000b_4k/$MINDX_TASK_ID/ttplogs
-mkdir -p /job/code/alllogs/kimi2_1000b_4k/$MINDX_TASK_ID/trainlogs
-mkdir -p /job/data/output/ckpt
+# -----------------------------------------------------------------------------
+# 1. 基础变量检查与设置
+# -----------------------------------------------------------------------------
+# 检查关键环境变量，缺失则报错
+: "${RANK:?RANK is required}"
+: "${WORLD_SIZE:?WORLD_SIZE is required}"
+: "${MINDX_TASK_ID:?MINDX_TASK_ID is required}"
+: "${XDL_IP:?XDL_IP is required}"
 
-# env for breakpoint ckpt
+OUTPUT_DIR="/job/data/output"
+DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
+SCRIPT_NAME=$(basename "$0")
+SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
+
+# 日志与Checkpoint目录配置
+LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${DATETIME}_${MINDX_TASK_ID}"
+CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
+
+# 定义具体的日志路径
+export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
+export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
+export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
+
+# Rank 0 负责创建目录并备份脚本
+if [[ "${RANK}" -eq 0 ]]; then 
+    echo "Initializing directories at $LOG_DIR"
+    mkdir -p "$LOG_DIR/plogs"
+    mkdir -p "$LOG_DIR/ttplogs"
+    mkdir -p "$LOG_DIR/trainlogs"
+    mkdir -p "$CKPT_SAVE_DIR"
+    
+    cp "$0" "$LOG_DIR/"
+    printenv > "$LOG_DIR/env_vars.sh"
+else
+    # 其他节点稍作等待，确保目录已创建（建议配合共享存储或确保最终一致性）
+    sleep 6s
+fi
+
+# -----------------------------------------------------------------------------
+# 2. 训练环境与网络配置
+# -----------------------------------------------------------------------------
 export RESUME_MODE_ENABLE=1
-
-export ASCEND_GLOBAL_LOG_LEVEL=2                                                    # 设置plog等级为info，应根据实际需要设计等级
-# 日志保存路径可根据实际情况修改
-export ASCEND_PROCESS_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/plogs/$XDL_IP       # 设置plog保存路径，其中$MINDX_TASK_ID为ascend-operator注入的任务uid环境变量，$XDL_IP为任务yaml中写入的环境变量，status.hostIP
-export TTP_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/ttplogs/ttplog$XDL_IP-$RANK    # 设置ttp日志保存路径，其中$RANK为ascend-operator为pytorch框架注入的环境变量
-export TRAIN_LOG_PATH=/job/code/alllogs/$MINDX_TASK_ID/trainlogs/$XDL_IP-$RANK      # 设置训练日志保存路径
-
-export HCCL_ASYNC_ERROR_HANDLING=0                 # 当HCCL_ASYNC_ERROR_HANDLING为0时，表示关闭watchdog功能。如果开启watchdog功能，可能会影响进程级恢复的正常使用。
+export ASCEND_GLOBAL_LOG_LEVEL=2
+export HCCL_ASYNC_ERROR_HANDLING=0
 export HCCL_WHITELIST_DISABLE=1
-export GLOO_SOCKET_IFNAME=enp66s0f0               # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
-export HCCL_SOCKET_IFNAME=enp66s0f0               # 如任务yaml中配置hostNetwork为false，则设置为eth0
-export TTP_OT=360
+export GLOO_SOCKET_IFNAME=enp66s0f0                # 物理机上可以通信的网口，根据主节点高速网卡实际情况进行配置，如任务yaml中配置hostNetwork为false，则设置为eth0
+export HCCL_SOCKET_IFNAME=enp66s0f0                # 如任务yaml中配置hostNetwork为false，则设置为eth0
 
+export TTP_OT=360
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export HCCL_CONNECT_TIMEOUT=3600
-export HCCL_BUFFSIZE=256
+export HCCL_BUFFSIZE=400
 export TASK_QUEUE_ENABLE=1
 export NPU_ASD_ENABLE=0
 export STREAMS_PER_DEVICE=32
+export HCCL_OP_BASE_FFTS_MODE=TRUE
+export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 
 
 # =============================================================================
 # Kimi2 1000B 4K Training Paths
 # =============================================================================
 
-CKPT_SAVE_DIR="/job/data/output/ckpt"
 MG_CKPT_SAVE_DIR="/job/data/output/ckpt/mcore"
 HF_CKPT_SAVE_DIR="/job/data/output/ckpt/hf"
 
 DATA_PATH="/job/data/datasets/nv_cc/300B/part_000000_deepseek32_671b_text_document"
-# DATA_PATH="/job/data/datasets/alpaca/alpaca_text_document"
 TOKENIZER_PATH="/job/data/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR="/job/data/models/moonshotai/Kimi-K2-Base"
+
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
   export TTP_ADDR=$POD_IP
@@ -232,6 +262,18 @@ OUTPUT_ARGS="
     --save-interval $SAVE_ITERS \
     --eval-interval $TRAIN_ITERS \
     --eval-iters 0 \
+"
+
+PROFILING_ARGS="
+    --profile \
+    --profile-step-start  5  \
+    --profile-step-end 7 \
+    --profile-ranks 0 \
+    --profile-level level1 \
+    --profile-with-cpu \
+    --profile-with-memory \
+    --profile-record-shapes \
+    --profile-save-path $log_dir/profiling \
 "
 
 unset HIGH_AVAILABILITY
