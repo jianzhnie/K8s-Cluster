@@ -4,9 +4,10 @@ import os
 import argparse
 import glob
 import re
+import math
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import torch
 from safetensors import safe_open
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 try:
@@ -21,12 +22,96 @@ def _tqdm_iter(iterable, total, desc):
     return _tqdm.tqdm(iterable, total=total, desc=desc)
 
 
+def _compare_keys_chunk(file1_path,
+                        file2_path,
+                        keys,
+                        tolerance,
+                        verbose,
+                        only_diff,
+                        header):
+    mismatch_count = 0
+    checked_count = 0
+    output_lines = []
+
+    try:
+        with safe_open(file1_path, framework="pt", device="cpu") as f1, \
+             safe_open(file2_path, framework="pt", device="cpu") as f2:
+            for key in keys:
+                checked_count += 1
+
+                s1_shape = None
+                s2_shape = None
+                s1_dtype = None
+                s2_dtype = None
+
+                try:
+                    slice1 = f1.get_slice(key)
+                    slice2 = f2.get_slice(key)
+                    s1_shape = slice1.get_shape()
+                    s2_shape = slice2.get_shape()
+                    s1_dtype = slice1.get_dtype()
+                    s2_dtype = slice2.get_dtype()
+                except Exception:
+                    pass
+
+                if s1_shape is not None and s2_shape is not None and s1_shape != s2_shape:
+                    mismatch_count += 1
+                    output_lines.append(f"\n[{header}][MISMATCH] Shape mismatch for '{key}':\n")
+                    output_lines.append(f"  File 1: {s1_shape}\n")
+                    output_lines.append(f"  File 2: {s2_shape}\n")
+                    continue
+
+                if s1_dtype is not None and s2_dtype is not None and s1_dtype != s2_dtype:
+                    mismatch_count += 1
+                    output_lines.append(f"\n[{header}][MISMATCH] Dtype mismatch for '{key}':\n")
+                    output_lines.append(f"  File 1: {s1_dtype}\n")
+                    output_lines.append(f"  File 2: {s2_dtype}\n")
+                    continue
+
+                with torch.no_grad():
+                    tensor1 = f1.get_tensor(key)
+                    tensor2 = f2.get_tensor(key)
+
+                if s1_shape is None or s2_shape is None:
+                    if tensor1.shape != tensor2.shape:
+                        mismatch_count += 1
+                        output_lines.append(f"\n[{header}][MISMATCH] Shape mismatch for '{key}':\n")
+                        output_lines.append(f"  File 1: {tensor1.shape}\n")
+                        output_lines.append(f"  File 2: {tensor2.shape}\n")
+                        continue
+
+                if s1_dtype is None or s2_dtype is None:
+                    if tensor1.dtype != tensor2.dtype:
+                        mismatch_count += 1
+                        output_lines.append(f"\n[{header}][MISMATCH] Dtype mismatch for '{key}':\n")
+                        output_lines.append(f"  File 1: {tensor1.dtype}\n")
+                        output_lines.append(f"  File 2: {tensor2.dtype}\n")
+                        continue
+
+                if not torch.allclose(tensor1, tensor2, atol=tolerance, rtol=tolerance):
+                    mismatch_count += 1
+                    diff = (tensor1 - tensor2).abs()
+                    max_diff = diff.max().item()
+                    mean_diff = diff.mean().item()
+                    output_lines.append(f"\n[{header}][MISMATCH] Value mismatch for '{key}':\n")
+                    output_lines.append(f"  Max diff: {max_diff:.6e}\n")
+                    output_lines.append(f"  Mean diff: {mean_diff:.6e}\n")
+                elif verbose and not only_diff:
+                    output_lines.append(f"[OK] {key}\n")
+
+    except Exception as e:
+        return 1, checked_count, [f"\n[{header}] Error during comparison: {e}\n"]
+
+    return mismatch_count, checked_count, output_lines
+
+
 def _compare_safetensors_pair(file1_path,
                               file2_path,
                               tolerance=1e-5,
                               verbose=False,
                               only_diff=False,
-                              label=None):
+                              label=None,
+                              inner_jobs=1):
 
     if not os.path.exists(file1_path):
         return 1, f"Error: File not found: {file1_path}\n"
@@ -39,9 +124,9 @@ def _compare_safetensors_pair(file1_path,
         output_lines.append(f"Comparing:\n  File 1: {file1_path}\n  File 2: {file2_path}\n")
 
     try:
-        with safe_open(file1_path, framework="pt", device="cpu") as f1, \
-             safe_open(file2_path, framework="pt", device="cpu") as f2:
+        with safe_open(file1_path, framework="pt", device="cpu") as f1:
             keys1 = set(f1.keys())
+        with safe_open(file2_path, framework="pt", device="cpu") as f2:
             keys2 = set(f2.keys())
     except Exception as e:
         return 1, f"Error opening safetensors files: {e}\n"
@@ -72,35 +157,53 @@ def _compare_safetensors_pair(file1_path,
         output_lines.append(f"\nComparing {len(common_keys)} common tensors...\n")
 
     checked_count = 0
-    for key in sorted(list(common_keys)):
-        tensor1 = f1.get_tensor(key)
-        tensor2 = f2.get_tensor(key)
-        checked_count += 1
+    if common_keys:
+        inner_jobs = int(inner_jobs or 1)
+        if inner_jobs < 1:
+            inner_jobs = 1
 
-        if tensor1.shape != tensor2.shape:
-            mismatch_count += 1
-            output_lines.append(f"\n[{header}][MISMATCH] Shape mismatch for '{key}':\n")
-            output_lines.append(f"  File 1: {tensor1.shape}\n")
-            output_lines.append(f"  File 2: {tensor2.shape}\n")
-            continue
+        if inner_jobs == 1 or len(common_keys) == 1:
+            mc, cc, out_lines = _compare_keys_chunk(
+                file1_path,
+                file2_path,
+                common_keys,
+                tolerance,
+                verbose,
+                only_diff,
+                header,
+            )
+            mismatch_count += mc
+            checked_count += cc
+            output_lines.extend(out_lines)
+        else:
+            chunk_size = max(1, math.ceil(len(common_keys) / inner_jobs))
+            chunks = [common_keys[i:i + chunk_size] for i in range(0, len(common_keys), chunk_size)]
+            results = [None] * len(chunks)
 
-        if tensor1.dtype != tensor2.dtype:
-            mismatch_count += 1
-            output_lines.append(f"\n[{header}][MISMATCH] Dtype mismatch for '{key}':\n")
-            output_lines.append(f"  File 1: {tensor1.dtype}\n")
-            output_lines.append(f"  File 2: {tensor2.dtype}\n")
-            continue
+            with ThreadPoolExecutor(max_workers=inner_jobs) as ex:
+                fut_to_idx = {
+                    ex.submit(_compare_keys_chunk,
+                              file1_path,
+                              file2_path,
+                              chunk,
+                              tolerance,
+                              verbose,
+                              only_diff,
+                              header): idx
+                    for idx, chunk in enumerate(chunks)
+                }
 
-        if not torch.allclose(tensor1, tensor2, atol=tolerance, rtol=tolerance):
-            mismatch_count += 1
-            diff = (tensor1 - tensor2).abs()
-            max_diff = diff.max().item()
-            mean_diff = diff.mean().item()
-            output_lines.append(f"\n[{header}][MISMATCH] Value mismatch for '{key}':\n")
-            output_lines.append(f"  Max diff: {max_diff:.6e}\n")
-            output_lines.append(f"  Mean diff: {mean_diff:.6e}\n")
-        elif verbose and not only_diff:
-            output_lines.append(f"[OK] {key}\n")
+                for fut in _tqdm_iter(as_completed(fut_to_idx), total=len(fut_to_idx), desc=f"{header} keys"):
+                    idx = fut_to_idx[fut]
+                    try:
+                        results[idx] = fut.result()
+                    except Exception as e:
+                        results[idx] = (1, 0, [f"\n[{header}] Error during comparison: {e}\n"])
+
+            for mc, cc, out_lines in results:
+                mismatch_count += mc
+                checked_count += cc
+                output_lines.extend(out_lines)
 
     if not only_diff:
         output_lines.append("\n" + "=" * 50 + "\n")
@@ -171,7 +274,8 @@ def _compare_dir_pair(source_dir,
                       verbose=False,
                       only_diff=False,
                       match_mode="path",
-                      jobs=1):
+                      jobs=1,
+                      inner_jobs=1):
     source_dir = os.path.abspath(source_dir)
     target_dir = os.path.abspath(target_dir)
 
@@ -230,7 +334,8 @@ def _compare_dir_pair(source_dir,
                           tolerance,
                           verbose,
                           only_diff,
-                          label): name
+                          label,
+                          inner_jobs): name
                 for name, src, tgt, label in pairs
             }
 
@@ -268,7 +373,8 @@ if __name__ == "__main__":
     parser.add_argument("--recursive", action="store_true", help="Recursively search for files in directories")
     parser.add_argument("--match-mode", choices=["path", "basename", "shard"], default="path",
                         help="How to match files in directory mode: path|basename|shard (default: path)")
-    parser.add_argument("--jobs", type=int, default=1, help="Number of worker processes for directory mode (default: 1)")
+    parser.add_argument("--jobs", type=int, default=1, help="Number of worker processes (directory mode) / parallelism (file mode).")
+    parser.add_argument("--inner-jobs", type=int, default=1, help="Per-file key parallelism in directory mode (default: 1)")
 
     args = parser.parse_args()
 
@@ -279,6 +385,9 @@ if __name__ == "__main__":
         if args.jobs < 1:
             print("Error: --jobs must be >= 1")
             sys.exit(2)
+        if args.inner_jobs < 1:
+            print("Error: --inner-jobs must be >= 1")
+            sys.exit(2)
         code, out = _compare_dir_pair(args.source_dir,
                                       args.target_dir,
                                       args.pattern,
@@ -287,7 +396,8 @@ if __name__ == "__main__":
                                       args.verbose,
                                       args.only_diff,
                                       args.match_mode,
-                                      args.jobs)
+                                      args.jobs,
+                                      args.inner_jobs)
         if out:
             print(out, end="")
         sys.exit(code)
@@ -301,7 +411,8 @@ if __name__ == "__main__":
                                           args.tolerance,
                                           args.verbose,
                                           args.only_diff,
-                                          None)
+                                          None,
+                                          args.inner_jobs if args.inner_jobs != 1 else args.jobs)
     if out:
         print(out, end="")
     sys.exit(code)
