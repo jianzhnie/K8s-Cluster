@@ -754,7 +754,6 @@ class MgCkptConvert(object):
 
             router_weights = None
             router_bias_weights = None
-            use_first_full_bias = False
 
             for ep_rank in self.ep_rank_list:
                 cur_router_w = mg_models[(tp0, ep_rank)].pop(router_key)
@@ -768,12 +767,8 @@ class MgCkptConvert(object):
                             (self.num_experts, ) + cur_router_w.shape[1:])
 
                 if router_bias_weights is None:
-                    if cur_router_b.shape[0] == self.num_experts:
-                        router_bias_weights = cur_router_b.clone()
-                        use_first_full_bias = True
-                    else:
-                        router_bias_weights = cur_router_b.new_empty(
-                            (self.num_experts, ))
+                    router_bias_weights = cur_router_b.new_empty(
+                        (self.num_experts, ))
 
                 start = ep_rank * local_expert_nums
                 end = start + local_expert_nums
@@ -783,11 +778,10 @@ class MgCkptConvert(object):
                 else:
                     router_weights[start:end] = cur_router_w
 
-                if not use_first_full_bias:
-                    if cur_router_b.shape[0] == self.num_experts:
-                        router_bias_weights[start:end] = cur_router_b[start:end]
-                    else:
-                        router_bias_weights[start:end] = cur_router_b
+                if cur_router_b.shape[0] == self.num_experts:
+                    router_bias_weights[start:end] = cur_router_b[start:end]
+                else:
+                    router_bias_weights[start:end] = cur_router_b
 
             shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_tp(
                 mg_models, shared_fc1_key)
