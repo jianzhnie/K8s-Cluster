@@ -774,12 +774,14 @@ class MgCkptConvert(object):
                 end = start + local_expert_nums
 
                 if cur_router_w.shape[0] == self.num_experts:
-                    router_weights[start:end] = cur_router_w[start:end]
+                    if ep_rank == 0:
+                        router_weights = cur_router_w.clone()
                 else:
                     router_weights[start:end] = cur_router_w
 
                 if cur_router_b.shape[0] == self.num_experts:
-                    router_bias_weights[start:end] = cur_router_b[start:end]
+                    if ep_rank == 0:
+                        router_bias_weights.copy_(cur_router_b)
                 else:
                     router_bias_weights[start:end] = cur_router_b
 
