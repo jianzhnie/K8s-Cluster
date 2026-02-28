@@ -5,7 +5,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 # 权重路径需根据实际情况修改
 # load-dir: huggingface 权重路径
 # save-dir: mcore 权重保存路径
-python /home/robin/QWEN3_for_PyTorch_2.7_code/examples/mcore/kimi2/convert_ckpt_kimi2.py\
+python examples/mcore/kimi2/convert_ckpt_kimi2.py\
     --moe-grouped-gemm \
     --target-tensor-parallel-size 2 \
     --target-pipeline-parallel-size 8 \
