@@ -7,4 +7,4 @@ home_dir="/home/robin/hfhub/models/moonshotai"
 bash compare_safetensors_parallel.sh \
     $home_dir/Kimi-K2-Base \
     $home_dir/Kimi-K2-Base-mcore-2-hf \
-    ./comparison_logs 64
+    ./comparison_logs 16

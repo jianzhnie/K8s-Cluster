@@ -429,9 +429,7 @@ if __name__ == '__main__':
         '--jobs',
         type=int,
         default=1,
-        help=
-        'Number of worker processes parallelism (file mode).'
-    )
+        help='Number of worker processes parallelism (file mode).')
     parser.add_argument(
         '--inner-jobs',
         type=int,

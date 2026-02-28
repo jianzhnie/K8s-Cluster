@@ -748,11 +748,41 @@ class MgCkptConvert(object):
             router_key, router_bias_key, shared_fc1_key, shared_fc2_key, expert_weight1_key, expert_weight2_key = _generate_moe_layer_key(
                 local_layer_idx, mtp_flag)
 
-            router_weights = mg_models[(self.tp_rank_list[0],
-                                        self.ep_rank_list[0])].pop(router_key)
-            router_bias_weights = mg_models[(
-                self.tp_rank_list[0],
-                self.ep_rank_list[0])].pop(router_bias_key)
+            local_expert_nums = self.num_experts // self.ep_size
+            tp0 = self.tp_rank_list[0]
+
+            router_weights = None
+            router_bias_weights = None
+            for ep_rank in self.ep_rank_list:
+                cur_router_w = mg_models[(tp0, ep_rank)].pop(router_key)
+                cur_router_b = mg_models[(tp0, ep_rank)].pop(router_bias_key)
+
+                if router_weights is None:
+                    if cur_router_w.shape[0] == self.num_experts:
+                        router_weights = cur_router_w.clone()
+                    else:
+                        router_weights = cur_router_w.new_empty(
+                            (self.num_experts, ) + cur_router_w.shape[1:])
+
+                if router_bias_weights is None:
+                    if cur_router_b.shape[0] == self.num_experts:
+                        router_bias_weights = cur_router_b.clone()
+                    else:
+                        router_bias_weights = cur_router_b.new_empty(
+                            (self.num_experts, ))
+
+                start = ep_rank * local_expert_nums
+                end = start + local_expert_nums
+
+                if cur_router_w.shape[0] == self.num_experts:
+                    router_weights[start:end] = cur_router_w[start:end]
+                else:
+                    router_weights[start:end] = cur_router_w
+
+                if cur_router_b.shape[0] == self.num_experts:
+                    router_bias_weights[start:end] = cur_router_b[start:end]
+                else:
+                    router_bias_weights[start:end] = cur_router_b
 
             shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_tp(
                 mg_models, shared_fc1_key)
@@ -776,7 +806,6 @@ class MgCkptConvert(object):
                 )
 
             # moe_gemm
-            local_expert_nums = self.num_experts // self.ep_size
             hf_local_gate_key = 'model.layers.{}.mlp.experts.{}.gate_proj.weight'
             hf_local_up_key = 'model.layers.{}.mlp.experts.{}.up_proj.weight'
             hf_local_down_key = 'model.layers.{}.mlp.experts.{}.down_proj.weight'
