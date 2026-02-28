@@ -70,7 +70,11 @@ def setup_logger(verbose=False):
 logger = logging.getLogger(__name__)
 
 
-def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
+def compare_safetensors(file1_path,
+                        file2_path,
+                        tolerance=1e-5,
+                        verbose=False,
+                        key=None):
     """
     Compare two safetensors files and report differences.
     Uses safe_open for memory-efficient loading.
@@ -95,11 +99,37 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
     keys1 = set(f1.keys())
     keys2 = set(f2.keys())
 
-    # Check for missing keys
-    missing_in_2 = keys1 - keys2
-    missing_in_1 = keys2 - keys1
+    if key is not None:
+        if key not in keys1 and key not in keys2:
+            logger.error(
+                f"\n[MISMATCH] Key missing in both files:\n  - {key}")
+            sys.exit(1)
+        if key not in keys1:
+            val = f2.get_tensor(key)
+            logger.error(
+                f"\n[MISMATCH] Key present in File 2 but missing in File 1:\n  - {key}"
+            )
+            logger.error(f'    Shape: {val.shape}')
+            logger.error(f'    Value: {val}')
+            sys.exit(1)
+        if key not in keys2:
+            val = f1.get_tensor(key)
+            logger.error(
+                f"\n[MISMATCH] Key present in File 1 but missing in File 2:\n  - {key}"
+            )
+            logger.error(f'    Shape: {val.shape}')
+            logger.error(f'    Value: {val}')
+            sys.exit(1)
 
-    if missing_in_2:
+        missing_in_2 = set()
+        missing_in_1 = set()
+        common_keys = {key}
+    else:
+        missing_in_2 = keys1 - keys2
+        missing_in_1 = keys2 - keys1
+        common_keys = keys1.intersection(keys2)
+
+    if key is None and missing_in_2:
         logger.warning(
             f'\nKeys present in File 1 but missing in File 2 ({len(missing_in_2)}):'
         )
@@ -111,7 +141,7 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
         if len(missing_in_2) > 10:
             logger.warning(f'  ... and {len(missing_in_2) - 10} more.')
 
-    if missing_in_1:
+    if key is None and missing_in_1:
         logger.warning(
             f'\nKeys present in File 2 but missing in File 1 ({len(missing_in_1)}):'
         )
@@ -123,21 +153,20 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
         if len(missing_in_1) > 10:
             logger.warning(f'  ... and {len(missing_in_1) - 10} more.')
 
-    common_keys = keys1.intersection(keys2)
     logger.info(f'\nComparing {len(common_keys)} common tensors...')
 
     diff_count = 0
     checked_count = 0
 
-    for key in sorted(list(common_keys)):
+    for tensor_key in sorted(list(common_keys)):
         # Load tensors only when needed (memory efficient)
-        tensor1 = f1.get_tensor(key)
-        tensor2 = f2.get_tensor(key)
+        tensor1 = f1.get_tensor(tensor_key)
+        tensor2 = f2.get_tensor(tensor_key)
         checked_count += 1
 
         # Check shape
         if tensor1.shape != tensor2.shape:
-            logger.error(f"\n[MISMATCH] Shape mismatch for '{key}':")
+            logger.error(f"\n[MISMATCH] Shape mismatch for '{tensor_key}':")
             logger.error(f'  File 1: {tensor1.shape}')
             logger.error(f'  File 2: {tensor2.shape}')
             logger.error(f'  File 1 value: {tensor1}')
@@ -147,7 +176,7 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
 
         # Check dtype
         if tensor1.dtype != tensor2.dtype:
-            logger.error(f"\n[MISMATCH] Dtype mismatch for '{key}':")
+            logger.error(f"\n[MISMATCH] Dtype mismatch for '{tensor_key}':")
             logger.error(f'  File 1: {tensor1.dtype}')
             logger.error(f'  File 2: {tensor2.dtype}')
             logger.error(f'  File 1 value: {tensor1}')
@@ -162,12 +191,11 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
             max_diff = diff.max().item()
             mean_diff = diff.mean().item()
 
-            # Find the index of the maximum difference
             max_diff_idx = torch.argmax(diff).item()
             v1 = tensor1.view(-1)[max_diff_idx].item()
             v2 = tensor2.view(-1)[max_diff_idx].item()
 
-            logger.error(f"\n[MISMATCH] Value mismatch for '{key}':")
+            logger.error(f"\n[MISMATCH] Value mismatch for '{tensor_key}':")
             logger.error(f'  Max diff: {max_diff:.6e}')
             logger.error(f'  Mean diff: {mean_diff:.6e}')
             logger.error(f'  At flat index {max_diff_idx}: {v1} vs {v2}')
@@ -175,7 +203,7 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
             logger.error(f'  File 2 value: {tensor2}')
             diff_count += 1
         elif verbose:
-            logger.info(f'[OK] {key}')
+            logger.info(f'[OK] {tensor_key}')
 
     logger.info('\n' + '=' * 50)
     logger.info('Comparison Summary:')
@@ -210,10 +238,18 @@ if __name__ == '__main__':
     parser.add_argument('--verbose',
                         action='store_true',
                         help='Print details for matching tensors too')
+    parser.add_argument(
+        '--key',
+        default=None,
+        help='Only compare a single tensor key (exact match)')
 
     args = parser.parse_args()
 
     # Setup logging configuration
     setup_logger(args.verbose)
 
-    compare_safetensors(args.source, args.target, args.tolerance, args.verbose)
+    compare_safetensors(args.source,
+                        args.target,
+                        args.tolerance,
+                        args.verbose,
+                        key=args.key)
