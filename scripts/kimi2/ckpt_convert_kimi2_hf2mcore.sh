@@ -12,7 +12,7 @@ tp=2
 pp=16
 ep=32
 
-model_dir="/home/robin/hfhub/models/moonshotai/"
+model_dir="/home/robin/hfhub/models/moonshotai"
 hf_model_dir=$model_dir/Kimi-K2-Base
 save_dir=$model_dir/Kimi-K2-Base-mcore_tp${tp}_pp${pp}_ep${ep}
 
