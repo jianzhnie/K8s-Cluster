@@ -101,14 +101,20 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
     if missing_in_2:
         logger.warning(f"\nKeys present in File 1 but missing in File 2 ({len(missing_in_2)}):")
         for k in sorted(list(missing_in_2))[:10]:
+            val = f1.get_tensor(k)
             logger.warning(f"  - {k}")
+            logger.warning(f"    Shape: {val.shape}")
+            logger.warning(f"    Value: {val}")
         if len(missing_in_2) > 10:
             logger.warning(f"  ... and {len(missing_in_2) - 10} more.")
 
     if missing_in_1:
         logger.warning(f"\nKeys present in File 2 but missing in File 1 ({len(missing_in_1)}):")
         for k in sorted(list(missing_in_1))[:10]:
+            val = f2.get_tensor(k)
             logger.warning(f"  - {k}")
+            logger.warning(f"    Shape: {val.shape}")
+            logger.warning(f"    Value: {val}")
         if len(missing_in_1) > 10:
             logger.warning(f"  ... and {len(missing_in_1) - 10} more.")
 
@@ -149,9 +155,16 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
             diff = (tensor1 - tensor2).abs()
             max_diff = diff.max().item()
             mean_diff = diff.mean().item()
+            
+            # Find the index of the maximum difference
+            max_diff_idx = torch.argmax(diff).item()
+            v1 = tensor1.view(-1)[max_diff_idx].item()
+            v2 = tensor2.view(-1)[max_diff_idx].item()
+
             logger.error(f"\n[MISMATCH] Value mismatch for '{key}':")
             logger.error(f"  Max diff: {max_diff:.6e}")
             logger.error(f"  Mean diff: {mean_diff:.6e}")
+            logger.error(f"  At flat index {max_diff_idx}: {v1} vs {v2}")
             logger.error(f"  File 1 value: {tensor1}")
             logger.error(f"  File 2 value: {tensor2}")
             diff_count += 1
