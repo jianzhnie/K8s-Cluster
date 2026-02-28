@@ -10,8 +10,8 @@ python examples/mcore/kimi2/convert_ckpt_kimi2_mcore2hf.py \
     --source-tensor-parallel-size 2 \
     --source-pipeline-parallel-size 8 \
     --source-expert-parallel-size 32 \
-    --load-dir /home/robin/hfhub/output/ckpt \
-    --save-dir /home/robin/hfhub/models/moonshotai/Kimi-K2-Base-mcore-2-hf \
+    --load-dir /home/robin/hfhub/output/ckpt/k8s_pretrain_kimi2_1t_4k_A3_ptd_1024_dies \
+    --save-dir /home/robin/hfhub/models/moonshotai/Kimi-K2-Base-mcore-2-hf_v2 \
     --num-layers 64 \
     --first-k-dense-replace 1 \
     --noop-layers 61,62,63

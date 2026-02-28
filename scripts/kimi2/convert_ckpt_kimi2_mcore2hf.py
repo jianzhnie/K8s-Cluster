@@ -102,8 +102,9 @@ class MgCkptConvert(object):
         # The original HF model has inv_freq shape [56], which corresponds to head_dim=112 (7168/64).
         # Even though qk_pos_emb_head_dim is 64, we use 112 to match the HF checkpoint structure.
         inv_freq_dim = self.hidden_size // self.num_attention_heads
-        self.inv_freq = 1.0 / (rotary_base**(
-            torch.arange(0, inv_freq_dim, 2).float() / inv_freq_dim))
+        self.inv_freq = (1.0 / (rotary_base**(
+            torch.arange(0, inv_freq_dim, 2).float() / inv_freq_dim))).to(
+                torch.bfloat16)
 
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
@@ -753,6 +754,8 @@ class MgCkptConvert(object):
 
             router_weights = None
             router_bias_weights = None
+            use_first_full_bias = False
+
             for ep_rank in self.ep_rank_list:
                 cur_router_w = mg_models[(tp0, ep_rank)].pop(router_key)
                 cur_router_b = mg_models[(tp0, ep_rank)].pop(router_bias_key)
@@ -767,6 +770,7 @@ class MgCkptConvert(object):
                 if router_bias_weights is None:
                     if cur_router_b.shape[0] == self.num_experts:
                         router_bias_weights = cur_router_b.clone()
+                        use_first_full_bias = True
                     else:
                         router_bias_weights = cur_router_b.new_empty(
                             (self.num_experts, ))
@@ -779,10 +783,11 @@ class MgCkptConvert(object):
                 else:
                     router_weights[start:end] = cur_router_w
 
-                if cur_router_b.shape[0] == self.num_experts:
-                    router_bias_weights[start:end] = cur_router_b[start:end]
-                else:
-                    router_bias_weights[start:end] = cur_router_b
+                if not use_first_full_bias:
+                    if cur_router_b.shape[0] == self.num_experts:
+                        router_bias_weights[start:end] = cur_router_b[start:end]
+                    else:
+                        router_bias_weights[start:end] = cur_router_b
 
             shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_tp(
                 mg_models, shared_fc1_key)
