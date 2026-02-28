@@ -18,9 +18,9 @@ save_dir=$model_dir/Kimi-K2-Base-mcore_tp${tp}_pp${pp}_ep${ep}
 
 python examples/mcore/kimi2/convert_ckpt_kimi2.py\
     --moe-grouped-gemm \
-    --target-tensor-parallel-size 2 \
-    --target-pipeline-parallel-size 8 \
-    --target-expert-parallel-size 32 \
+    --target-tensor-parallel-size $tp \
+    --target-pipeline-parallel-size $pp \
+    --target-expert-parallel-size $ep \
     --load-dir $hf_model_dir \
     --save-dir $save_dir \
     --num-layers 64 \
