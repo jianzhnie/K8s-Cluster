@@ -64,7 +64,8 @@ class MgCkptConvert(object):
                  lora_r: int = 16,
                  lora_alpha: int = 32,
                  lora_target_modules: str = None,
-                 save_lora_to_hf: bool = False):
+                 save_lora_to_hf: bool = False,
+                 rotary_base: float = 10000.0):
         self.tp_size = tp_size
         self.pp_size = pp_size
         self.ep_size = ep_size
@@ -98,9 +99,12 @@ class MgCkptConvert(object):
         self.v_head_dim = V_HEAD_DIM
         self.mtp_layer_number = MTP_LAYER_INDEX
 
-        self.inv_freq = 1.0 / (10000**(torch.arange(
-            0, self.qk_pos_emb_head_dim, 2).float() / self.qk_pos_emb_head_dim))
-            
+        # The original HF model has inv_freq shape [56], which corresponds to head_dim=112 (7168/64).
+        # Even though qk_pos_emb_head_dim is 64, we use 112 to match the HF checkpoint structure.
+        inv_freq_dim = self.hidden_size // self.num_attention_heads
+        self.inv_freq = 1.0 / (rotary_base**(
+            torch.arange(0, inv_freq_dim, 2).float() / inv_freq_dim))
+
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
         self.lora_target_modules = lora_target_modules
@@ -618,6 +622,10 @@ class MgCkptConvert(object):
             f'model.layers.{hf_layer_idx}.self_attn.q_b_proj.weight'] = q_b_proj
         hf_dict[
             f'model.layers.{hf_layer_idx}.self_attn.kv_b_proj.weight'] = kv_b_proj
+
+        hf_dict[
+            f'model.layers.{hf_layer_idx}.self_attn.rotary_emb.inv_freq'] = self.inv_freq.clone(
+            )
 
     def set_model_attn_lora(self, hf_dict, mg_models, hf_layer_idx,
                             local_layer_idx):
@@ -1426,6 +1434,10 @@ def get_args():
     parser.add_argument('--save-lora-to-hf',
                         action='store_true',
                         help='only save lora ckpt to hf')
+    parser.add_argument('--rotary-base',
+                        type=float,
+                        default=10000.0,
+                        help='Rotary base for RoPE')
 
     args = parser.parse_args()
     return args
@@ -1455,7 +1467,8 @@ def main():
         lora_r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_target_modules=args.lora_target_modules,
-        save_lora_to_hf=args.save_lora_to_hf)
+        save_lora_to_hf=args.save_lora_to_hf,
+        rotary_base=args.rotary_base)
     converter.run()
 
 
