@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import sys
-import os
 import argparse
-import torch
 import logging
+import os
+import sys
+
+import torch
 from safetensors import safe_open
 
 
@@ -11,17 +12,17 @@ class CustomFormatter(logging.Formatter):
     """
     Custom formatter with color support and simplified INFO logging.
     """
-    grey = "\x1b[38;20m"
-    green = "\x1b[32;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
-    bold_red = "\x1b[31;1m"
-    reset = "\x1b[0m"
-    
+    grey = '\x1b[38;20m'
+    green = '\x1b[32;20m'
+    yellow = '\x1b[33;20m'
+    red = '\x1b[31;20m'
+    bold_red = '\x1b[31;1m'
+    reset = '\x1b[0m'
+
     # Detailed format for Debug/Error
-    detailed_format = "%(asctime)s - %(levelname)s - %(message)s"
+    detailed_format = '%(asctime)s - %(levelname)s - %(message)s'
     # Simplified format for Info (just the message, like print)
-    info_format = "%(message)s"
+    info_format = '%(message)s'
 
     FORMATS = {
         logging.DEBUG: grey + detailed_format + reset,
@@ -43,25 +44,25 @@ def setup_logger(verbose=False):
     """
     # Get the logger for this module
     logger = logging.getLogger(__name__)
-    
+
     # Avoid adding duplicate handlers if setup_logger is called multiple times
     if logger.hasHandlers():
         logger.handlers.clear()
-        
+
     logger.setLevel(logging.INFO if not verbose else logging.DEBUG)
-    
+
     # Use sys.stdout for standard output to match 'print' behavior
     # This ensures piped output works as expected
     handler = logging.StreamHandler(sys.stdout)
-    
+
     # Set the custom formatter
     handler.setFormatter(CustomFormatter())
-    
+
     logger.addHandler(handler)
-    
+
     # Propagate set to False to prevent double logging if root logger is configured
     logger.propagate = False
-    
+
     return logger
 
 
@@ -75,20 +76,20 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
     Uses safe_open for memory-efficient loading.
     """
     if not os.path.exists(file1_path):
-        logger.error(f"Error: File not found: {file1_path}")
+        logger.error(f'Error: File not found: {file1_path}')
         sys.exit(1)
     if not os.path.exists(file2_path):
-        logger.error(f"Error: File not found: {file2_path}")
+        logger.error(f'Error: File not found: {file2_path}')
         sys.exit(1)
 
-    logger.info(f"Comparing:\n  File 1: {file1_path}\n  File 2: {file2_path}")
+    logger.info(f'Comparing:\n  File 1: {file1_path}\n  File 2: {file2_path}')
 
     try:
         # Open files context managers
-        f1 = safe_open(file1_path, framework="pt", device="cpu")
-        f2 = safe_open(file2_path, framework="pt", device="cpu")
+        f1 = safe_open(file1_path, framework='pt', device='cpu')
+        f2 = safe_open(file2_path, framework='pt', device='cpu')
     except Exception as e:
-        logger.error(f"Error opening safetensors files: {e}")
+        logger.error(f'Error opening safetensors files: {e}')
         sys.exit(1)
 
     keys1 = set(f1.keys())
@@ -99,27 +100,31 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
     missing_in_1 = keys2 - keys1
 
     if missing_in_2:
-        logger.warning(f"\nKeys present in File 1 but missing in File 2 ({len(missing_in_2)}):")
+        logger.warning(
+            f'\nKeys present in File 1 but missing in File 2 ({len(missing_in_2)}):'
+        )
         for k in sorted(list(missing_in_2))[:10]:
             val = f1.get_tensor(k)
-            logger.warning(f"  - {k}")
-            logger.warning(f"    Shape: {val.shape}")
-            logger.warning(f"    Value: {val}")
+            logger.warning(f'  - {k}')
+            logger.warning(f'    Shape: {val.shape}')
+            logger.warning(f'    Value: {val}')
         if len(missing_in_2) > 10:
-            logger.warning(f"  ... and {len(missing_in_2) - 10} more.")
+            logger.warning(f'  ... and {len(missing_in_2) - 10} more.')
 
     if missing_in_1:
-        logger.warning(f"\nKeys present in File 2 but missing in File 1 ({len(missing_in_1)}):")
+        logger.warning(
+            f'\nKeys present in File 2 but missing in File 1 ({len(missing_in_1)}):'
+        )
         for k in sorted(list(missing_in_1))[:10]:
             val = f2.get_tensor(k)
-            logger.warning(f"  - {k}")
-            logger.warning(f"    Shape: {val.shape}")
-            logger.warning(f"    Value: {val}")
+            logger.warning(f'  - {k}')
+            logger.warning(f'    Shape: {val.shape}')
+            logger.warning(f'    Value: {val}')
         if len(missing_in_1) > 10:
-            logger.warning(f"  ... and {len(missing_in_1) - 10} more.")
+            logger.warning(f'  ... and {len(missing_in_1) - 10} more.')
 
     common_keys = keys1.intersection(keys2)
-    logger.info(f"\nComparing {len(common_keys)} common tensors...")
+    logger.info(f'\nComparing {len(common_keys)} common tensors...')
 
     diff_count = 0
     checked_count = 0
@@ -133,65 +138,78 @@ def compare_safetensors(file1_path, file2_path, tolerance=1e-5, verbose=False):
         # Check shape
         if tensor1.shape != tensor2.shape:
             logger.error(f"\n[MISMATCH] Shape mismatch for '{key}':")
-            logger.error(f"  File 1: {tensor1.shape}")
-            logger.error(f"  File 2: {tensor2.shape}")
-            logger.error(f"  File 1 value: {tensor1}")
-            logger.error(f"  File 2 value: {tensor2}")
+            logger.error(f'  File 1: {tensor1.shape}')
+            logger.error(f'  File 2: {tensor2.shape}')
+            logger.error(f'  File 1 value: {tensor1}')
+            logger.error(f'  File 2 value: {tensor2}')
             diff_count += 1
             continue
 
         # Check dtype
         if tensor1.dtype != tensor2.dtype:
             logger.error(f"\n[MISMATCH] Dtype mismatch for '{key}':")
-            logger.error(f"  File 1: {tensor1.dtype}")
-            logger.error(f"  File 2: {tensor2.dtype}")
-            logger.error(f"  File 1 value: {tensor1}")
-            logger.error(f"  File 2 value: {tensor2}")
+            logger.error(f'  File 1: {tensor1.dtype}')
+            logger.error(f'  File 2: {tensor2.dtype}')
+            logger.error(f'  File 1 value: {tensor1}')
+            logger.error(f'  File 2 value: {tensor2}')
             diff_count += 1
             continue
 
         # Check values
-        if not torch.allclose(tensor1, tensor2, atol=tolerance, rtol=tolerance):
+        if not torch.allclose(tensor1, tensor2, atol=tolerance,
+                              rtol=tolerance):
             diff = (tensor1 - tensor2).abs()
             max_diff = diff.max().item()
             mean_diff = diff.mean().item()
-            
+
             # Find the index of the maximum difference
             max_diff_idx = torch.argmax(diff).item()
             v1 = tensor1.view(-1)[max_diff_idx].item()
             v2 = tensor2.view(-1)[max_diff_idx].item()
 
             logger.error(f"\n[MISMATCH] Value mismatch for '{key}':")
-            logger.error(f"  Max diff: {max_diff:.6e}")
-            logger.error(f"  Mean diff: {mean_diff:.6e}")
-            logger.error(f"  At flat index {max_diff_idx}: {v1} vs {v2}")
-            logger.error(f"  File 1 value: {tensor1}")
-            logger.error(f"  File 2 value: {tensor2}")
+            logger.error(f'  Max diff: {max_diff:.6e}')
+            logger.error(f'  Mean diff: {mean_diff:.6e}')
+            logger.error(f'  At flat index {max_diff_idx}: {v1} vs {v2}')
+            logger.error(f'  File 1 value: {tensor1}')
+            logger.error(f'  File 2 value: {tensor2}')
             diff_count += 1
         elif verbose:
-            logger.info(f"[OK] {key}")
+            logger.info(f'[OK] {key}')
 
-    logger.info("\n" + "=" * 50)
-    logger.info("Comparison Summary:")
-    logger.info(f"  Total keys checked: {checked_count}")
-    logger.info(f"  Mismatched tensors: {diff_count}")
+    logger.info('\n' + '=' * 50)
+    logger.info('Comparison Summary:')
+    logger.info(f'  Total keys checked: {checked_count}')
+    logger.info(f'  Mismatched tensors: {diff_count}')
     if missing_in_1 or missing_in_2:
-        logger.warning(f"  Missing keys: {len(missing_in_1) + len(missing_in_2)}")
+        logger.warning(
+            f'  Missing keys: {len(missing_in_1) + len(missing_in_2)}')
 
     if diff_count == 0 and not missing_in_1 and not missing_in_2:
-        logger.info("\nSUCCESS: Files are identical!")
+        logger.info('\nSUCCESS: Files are identical!')
         sys.exit(0)
     else:
-        logger.error("\nFAILURE: Files differ.")
+        logger.error('\nFAILURE: Files differ.')
         sys.exit(1)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Compare two safetensors files.")
-    parser.add_argument("--source", required=True, help="Path to the source safetensors file")
-    parser.add_argument("--target", required=True, help="Path to the target safetensors file")
-    parser.add_argument("--tolerance", type=float, default=1e-5, help="Tolerance for floating point comparison (default: 1e-5)")
-    parser.add_argument("--verbose", action="store_true", help="Print details for matching tensors too")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Compare two safetensors files.')
+    parser.add_argument('--source',
+                        required=True,
+                        help='Path to the source safetensors file')
+    parser.add_argument('--target',
+                        required=True,
+                        help='Path to the target safetensors file')
+    parser.add_argument(
+        '--tolerance',
+        type=float,
+        default=1e-5,
+        help='Tolerance for floating point comparison (default: 1e-5)')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Print details for matching tensors too')
 
     args = parser.parse_args()
 
