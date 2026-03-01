@@ -7,7 +7,13 @@
   - [目录](#目录)
   - [1. 基础配置与环境](#1-基础配置与环境)
   - [2. 集群与节点管理](#2-集群与节点管理)
-    - [2.1 标记坏节点并禁止调度](#21-标记坏节点并禁止调度)
+    - [2.1 给节点打Label](#21-给节点打label)
+    - [2.2 标记坏节点并禁止调度](#22-标记坏节点并禁止调度)
+    - [2.3 查看所有节点的 Label](#23-查看所有节点的-label)
+      - [1. 查看所有节点的 Label](#1-查看所有节点的-label)
+      - [2. 统计集群中出现过的所有 Label Key（去重）](#2-统计集群中出现过的所有-label-key去重)
+      - [3. 查找打过特定 Label 的节点](#3-查找打过特定-label-的节点)
+      - [4. 查找 Pod 的 Label](#4-查找-pod-的-label)
   - [3. Pod 与容器管理](#3-pod-与容器管理)
   - [4. 工作负载 (Deployments/Jobs)](#4-工作负载-deploymentsjobs)
   - [5. 网络与服务](#5-网络与服务)
@@ -51,7 +57,56 @@
 | `kubectl uncordon <node>`       | 恢复调度                        | `kubectl uncordon bms1889`                  |
 | `kubectl drain <node>`          | 驱逐节点上的 Pod (维护前清空)   | `kubectl drain bms1889 --ignore-daemonsets` |
 
-### 2.1 标记坏节点并禁止调度
+
+### 2.1 给节点打Label 
+
+在 k8s 集群中，给节点打 Label 是一种常见的操作，用于对节点进行分类、标识或分组。使用 `kubectl label node` 命令可以给节点添加标签。下面的脚本提供了批量给节点打 Label 的方法。
+
+```bash
+#!/usr/bin/env bash
+
+start="${1:-bms0001}"
+end="${2:-bms0448}"
+label="${3}"
+
+if [ -z "$label" ]; then
+  echo "Usage: $0 <start_node> <end_node> <label>"
+  echo "Example: $0 bms0001 bms0448 env=prod"
+  exit 1
+fi
+
+# Strip 'bms' prefix
+start_num="${start#bms}"
+end_num="${end#bms}"
+
+echo "Labeling nodes from bms${start_num} to bms${end_num} with ${label}..."
+
+# Generate nodes list with padding (assuming 4 digits like bms0001)
+nodes=$(seq -f "bms%04g" "$start_num" "$end_num")
+
+# Apply label using xargs to handle list
+echo "$nodes" | xargs kubectl label nodes --overwrite "$label"
+```
+你需要提供具体的标签键值对（例如 `env=prod`），命令如下：
+
+```bash
+# 用法: bash scripts/labeled_nodes.sh <开始节点> <结束节点> <标签键=值>
+bash scripts/labeled_nodes.sh bms0001 bms0448 <key>=<value>
+```
+
+或者直接使用下面的一行命令（请替换 `<key>=<value>` 为你实际要打的标签）：
+
+```bash
+kubectl label nodes $(seq -f "bms%04g" 1 448) <key>=<value> --overwrite
+```
+
+**验证标签是否打上：**
+
+```bash
+kubectl get nodes bms0001 bms0448 --show-labels
+```
+
+### 2.2 标记坏节点并禁止调度
 
 典型场景：节点硬件/NPU/网络等存在问题，希望调度默认避开这些节点。
 
@@ -132,6 +187,58 @@ tolerations:
 - 有统一 CI/CD 与模板体系：在此基础上再使用标签 + nodeAffinity 做更精细控制。
 
 ---
+
+### 2.3 查看所有节点的 Label
+
+要查找 Kubernetes 中所有打过的 Label（标签），主要分两种场景：**查看所有节点的 Label** 和 **统计集群中出现过哪些 Label Key**。
+
+#### 1. 查看所有节点的 Label
+
+这是最常用的命令，会列出每个节点及其所有的 Label：
+
+```bash
+kubectl get nodes --show-labels
+```
+
+如果 Label 太多导致显示不全，可以用 `json` 或 `yaml` 格式查看：
+
+```bash
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels}{"\n"}{end}'
+```
+
+#### 2. 统计集群中出现过的所有 Label Key（去重）
+
+如果你想知道“目前集群里到底用过哪些 Label 键名”，可以使用以下命令（需要 `jq`）：
+
+```bash
+kubectl get nodes -o json | jq -r '.items[].metadata.labels | keys[]' | sort | uniq
+```
+
+如果没有 `jq`，可以用 `grep` 粗略查看：
+
+```bash
+kubectl get nodes --show-labels | grep -oP '(?<=,|^)[^=,]+(?==)' | sort | uniq
+```
+
+#### 3. 查找打过特定 Label 的节点
+
+如果你是想找“哪些节点打了某个 Label”，可以使用 `-l` 参数：
+
+```bash
+# 查找打过 disktype=ssd 的节点
+kubectl get nodes -l disktype=ssd
+
+# 查找打过 environment 标签的节点（不管值是什么）
+kubectl get nodes -l environment
+```
+
+#### 4. 查找 Pod 的 Label
+
+如果你的目标是 Pod 而不是 Node，把上面的 `nodes` 换成 `pods` 即可：
+
+```bash
+kubectl get pods --show-labels -A
+```
 
 ## 3. Pod 与容器管理
 最核心的日常操作，涉及 Pod 的增删改查与交互。
