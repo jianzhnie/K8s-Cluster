@@ -223,7 +223,7 @@ GPT_ARGS="
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --make-vocab-size-divisible-by 1 \
-    --lr 1.0e-5 \
+    --lr 0 \
     --train-iters $TRAIN_ITERS \
     --lr-decay-style cosine \
     --untie-embeddings-and-output-weights \
@@ -241,8 +241,8 @@ GPT_ARGS="
     --swiglu \
     --no-masked-softmax-fusion \
     --attention-softmax-in-fp32 \
-    --min-lr 1.0e-7 \
-    --weight-decay 1e-2 \
+    --min-lr 0 \
+    --weight-decay 0 \
     --lr-warmup-iters 0 \
     --clip-grad 1.0 \
     --adam-beta1 0.9 \
