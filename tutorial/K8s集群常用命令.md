@@ -9,6 +9,7 @@
   - [2. 集群与节点管理](#2-集群与节点管理)
     - [2.1 给节点打Label](#21-给节点打label)
     - [2.2 标记坏节点并禁止调度](#22-标记坏节点并禁止调度)
+      - [使用实例-给节点打污点](#使用实例-给节点打污点)
     - [2.3 查看所有节点的 Label](#23-查看所有节点的-label)
       - [1. 查看所有节点的 Label](#1-查看所有节点的-label)
       - [2. 统计集群中出现过的所有 Label Key（去重）](#2-统计集群中出现过的所有-label-key去重)
@@ -185,6 +186,50 @@ tolerations:
 - 应急/短期维护：使用 `kubectl cordon` / `kubectl drain`。
 - 集群默认避开坏节点（推荐）：对节点添加污点 taint。
 - 有统一 CI/CD 与模板体系：在此基础上再使用标签 + nodeAffinity 做更精细控制。
+
+
+#### 使用实例-给节点打污点
+
+使用下面的脚本给节点 bms0385 到 bms0448 打上污点 `node-status=bad:NoSchedule`
+
+```bash
+#!/usr/bin/env bash
+
+start="${1:-bms0385}"
+end="${2:-bms0448}"
+taint="${3:-node-status=bad:NoSchedule}"
+
+# Strip 'bms' prefix
+start_num="${start#bms}"
+end_num="${end#bms}"
+
+echo "Tainting nodes from bms${start_num} to bms${end_num} with ${taint}..."
+
+# Generate nodes list with padding (assuming 4 digits like bms0001)
+nodes=$(seq -f "bms%04g" "$start_num" "$end_num")
+
+# Apply taint using xargs to handle list
+echo "$nodes" | xargs kubectl taint nodes --overwrite "$taint"
+```
+
+你需要提供具体的污点键值对（例如 `node-status=bad:NoSchedule`），命令如下：
+
+```bash
+# 用法: bash scripts/taint_nodes.sh <开始节点> <结束节点> <污点键=值>
+bash scripts/taint_nodes.sh bms0385 bms0448 node-status=bad:NoSchedule
+```
+
+或者直接使用下面的一行命令（请替换 `<key>=<value>` 为你实际要打的污点）：
+
+```bash
+kubectl taint nodes $(seq -f "bms%04g" 385 448) node-status=bad:NoSchedule --overwrite
+```
+
+要取消节点的污点, 只需要修改 `node-status` 为 `-` 即可
+```bash
+kubectl taint nodes $(seq -f "bms%04g" 385 448) node-status-
+```
+
 
 ---
 
