@@ -65,7 +65,7 @@ class MgCkptConvert(object):
                  lora_alpha: int = 32,
                  lora_target_modules: str = None,
                  save_lora_to_hf: bool = False,
-                 rotary_base: float = 10000.0):
+                 rotary_base: float = 50000.0):
         self.tp_size = tp_size
         self.pp_size = pp_size
         self.ep_size = ep_size
@@ -767,22 +767,19 @@ class MgCkptConvert(object):
                             (self.num_experts, ) + cur_router_w.shape[1:])
 
                 if router_bias_weights is None:
-                    router_bias_weights = cur_router_b.new_empty(
-                        (self.num_experts, ))
+                    if cur_router_b.shape[0] == self.num_experts:
+                        router_bias_weights = cur_router_b.clone()
+                    else:
+                        router_bias_weights = cur_router_b.new_empty(
+                            (self.num_experts, ))
 
                 start = ep_rank * local_expert_nums
                 end = start + local_expert_nums
 
-                if cur_router_w.shape[0] == self.num_experts:
-                    if ep_rank == 0:
-                        router_weights = cur_router_w.clone()
-                else:
+                if cur_router_w.shape[0] != self.num_experts:
                     router_weights[start:end] = cur_router_w
 
-                if cur_router_b.shape[0] == self.num_experts:
-                    if ep_rank == 0:
-                        router_bias_weights.copy_(cur_router_b)
-                else:
+                if cur_router_b.shape[0] != self.num_experts:
                     router_bias_weights[start:end] = cur_router_b
 
             shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_tp(
