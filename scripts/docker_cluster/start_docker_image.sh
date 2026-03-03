@@ -97,11 +97,16 @@ start_docker() {
       done
   fi
 
+  local docker_run_flags=(-d)
+  if [[ -t 0 && -t 1 ]]; then
+    docker_run_flags=(-dit)
+  fi
+
   # 5. 准备 Docker 参数数组 (使用数组比字符串拼接更安全、更易读)
   # 注意: --shm-size 对于分布式训练很重要，建议显式设置或依赖 --ipc=host
   #      --privileged 或 --cap-add=SYS_PTRACE 可能需要用于 NPU 驱动访问
   local docker_run_cmd=(
-      docker run -dit
+      docker run "${docker_run_flags[@]}"
       --ipc=host
       --net=host
       --privileged
