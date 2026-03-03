@@ -122,8 +122,6 @@ start_docker() {
       -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/
       -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info
       -v /root/.cache:/root/.cache
-      -v /etc/timezone:/etc/timezone:ro
-      -v /etc/localtime:/etc/localtime:ro
   )
 
   # 自动检测 npu-smi 路径并挂载
