@@ -132,7 +132,7 @@ spec:
                 path: /user/restore/reset/default.reset-config-robin-kimi2-1t-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/QWEN3_for_PyTorch_2.7_code
+                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/MindSpeed-LLM
             - name: data
               hostPath:
                 path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/hfhub/
@@ -243,7 +243,7 @@ spec:
                 path: /user/restore/reset/default.reset-config-robin-kimi2-1t-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/QWEN3_for_PyTorch_2.7_code
+                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/MindSpeed-LLM
             - name: data
               hostPath:
                 path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/hfhub/
