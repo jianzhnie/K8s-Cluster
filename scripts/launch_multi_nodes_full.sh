@@ -60,6 +60,7 @@ PROJECT_DIR="/mnt/yWXKUIzKaqvtk0rLm/model_train/projects/MindSpeed-LLM-0105"
 DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/datasets/pretrain_100B/part00_text_document"
 DATA_DIR="/mnt/yWXKUIzKaqvtk0rLm/datasets/pretrain_100B"
 DATA_NAME_PATTERN="part*"
+DATA_PREFIX_FILE="/mnt/yWXKUIzKaqvtk0rLm/datasets/data_prefixes.txt"
 TOKENIZER_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/models/LLM-Research/Meta-Llama-3.1-405B"
 CKPT_LOAD_DIR=""
 
@@ -139,6 +140,21 @@ cleanup() {
 #----------------------------------------
 
 # Auto-discover data paths (populate no_ext_files array)
+load_data_prefixes_from_file() {
+    local file="$1"
+    mapfile -t DATA_FILES_LIST < <(grep -v -e '^\s*$' -e '^\s*#' "$file" 2>/dev/null | sed 's/[[:space:]]*$//' )
+    if [ ${#DATA_FILES_LIST[@]} -eq 0 ]; then
+        return 1
+    fi
+    printf "[INFO] 从文件加载到 %d 个数据路径\\n" "${#DATA_FILES_LIST[@]}"
+    for p in "${DATA_FILES_LIST[@]}"; do
+        printf "  - %s\n" "$p"
+    done
+
+    return 0
+}
+
+
 discover_data_prefixes() {
     local data_dir="$1"
     local pattern="$2"
@@ -160,7 +176,6 @@ discover_data_prefixes() {
     printf '  - %s\n' "${out_array[@]}"
     return 0
 }
-
 
 
 print_config() {
@@ -274,6 +289,13 @@ wait_for_completion() {
 
 
 prepare_data_prefixes() {
+    if [ -n "${DATA_PREFIX_FILE:-}" ] && [ -f "$DATA_PREFIX_FILE" ]; then
+        if load_data_prefixes_from_file "$DATA_PREFIX_FILE"; then
+            DATA_PREFIXES="${DATA_FILES_LIST[*]}"
+            echo "[INFO] 自动生成的数据集前缀列表 (From File): $DATA_PREFIXES"
+            return 0
+        fi
+    fi
     if ! discover_data_prefixes "$DATA_DIR" "$DATA_NAME_PATTERN" DATA_FILES_LIST; then
         return 1
     fi
