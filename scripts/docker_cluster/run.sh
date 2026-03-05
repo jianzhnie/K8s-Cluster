@@ -36,10 +36,10 @@ LAUNCH_TRAIN_SCRIPT="${SCRIPT_DIR}/launch_multi_nodes_full.sh"
 export IMAGE_NAME="${IMAGE_NAME:-cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm}"
 export IMAGE_TAG="${IMAGE_TAG:-openeuler22.03-mindspeed-llm-2.3.0-a3-arm}"
 export CONTAINER_NAME="${CONTAINER_NAME:-mindspeed-llm-env}"
-export IMAGE_PATH="${IMAGE_PATH:-/mnt/9w1N7vBPmO3wMAYjqZL/robin/mindspeed-llm-2.3.0-a3-arm.tarr}"
+export IMAGE_PATH="${IMAGE_PATH:-/llm_workspace_1P/robin/mindspeed-llm-2.3.0-a3-arm.tarr}"
 export NPUS="${NPUS:-0,1,2,3,4,5,6,7}"
-export SHARE_PATH_HOST="${SHARE_PATH_HOST:-/mnt/9w1N7vBPmO3wMAYjqZL/robin}"
-export SHARE_PATH_CONTAINER="${SHARE_PATH_CONTAINER:-/mnt/9w1N7vBPmO3wMAYjqZL/robin}"
+export SHARE_PATH_HOST="${SHARE_PATH_HOST:-/llm_workspace_1P/robin}"
+export SHARE_PATH_CONTAINER="${SHARE_PATH_CONTAINER:-/llm_workspace_1P/robin}"
 
 # --- 日志函数 ---
 log() {
