@@ -257,7 +257,7 @@ spec:
     volumes:
       - name: code
         hostPath:
-          path: /mnt/9w1N7vBPmO3wMAYjqZL/train/MindSpeed-LLM # 确保所有节点该路径存在且内容一致
+          path: /llm_workspace_1P/train/MindSpeed-LLM # 确保所有节点该路径存在且内容一致
     ```
 
 ### 3.3 多机配置实战步骤 (以双机 16 卡为例)
