@@ -132,10 +132,10 @@ spec:
                 path: /user/restore/reset/default.reset-config-robin-deepseek3-1000b-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/MindSpeed-LLM
+                path: /llm_workspace_1P/robin/MindSpeed-LLM
             - name: data
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/hfhub/
+                path: /llm_workspace_1P/robin/hfhub/
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
@@ -147,7 +147,7 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-deepseek3-1000b-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /llm_workspace_1P/ranktable/default.robin-deepseek3-1000b-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory
     Worker:
       replicas: 127
@@ -243,10 +243,10 @@ spec:
                 path: /user/restore/reset/default.reset-config-robin-deepseek3-1000b-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
             - name: code
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/MindSpeed-LLM
+                path: /llm_workspace_1P/robin/MindSpeed-LLM
             - name: data
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/robin/hfhub/
+                path: /llm_workspace_1P/robin/hfhub/
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
@@ -258,5 +258,5 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /mnt/9w1N7vBPmO3wMAYjqZL/ranktable/default.robin-deepseek3-1000b-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /llm_workspace_1P/ranktable/default.robin-deepseek3-1000b-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory
