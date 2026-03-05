@@ -44,6 +44,6 @@ docker run -d \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /root/.cache:/root/.cache \
-    -v /llm_workspace_1P/robin:/home/robin:rw \
+    -v /llm_workspace_1P:/llm_workspace_1P:rw \
     -it ${IMAGE_NAME} \
     /bin/bash -c "while true; do sleep 1000; done"

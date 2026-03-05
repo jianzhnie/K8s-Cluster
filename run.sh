@@ -20,17 +20,19 @@ rsync -avzP Qwen3.tar root@10.42.29.130:/llm_workspace_1P/robin/hfhub/models/Qwe
 
 rsync -avz K8s-Cluster  root@10.42.29.130:/llm_workspace_1P/robin/
 
-
 # 从服务器下载文件
 rsync -avz root@10.42.29.130:/llm_workspace_1P/robin/MindSpeed-LLM/pcl_scripts scripts/
 
 
 ## 在服务器上文件同步
 # 上传 kimi 脚本
-scp -r K8s-Cluster/scripts/kimi2 MindSpeed-LLM/examples/mcore/
+rsync -avz K8s-Cluster/scripts/kimi2 MindSpeed-LLM/examples/mcore/
+
+# 上传 pcl 脚本
+rsync -avz K8s-Cluster/scripts/pcl_scripts  MindSpeed-LLM/
 
 # 上传 k8s 脚本
-scp -r K8s-Cluster/k8scluster/*.sh  MindSpeed-LLM/scripts/
+rsync -avz K8s-Cluster/k8scluster/*.sh  MindSpeed-LLM/scripts/
 
 ## K8S 节点标签
 kubectl label nodes $(seq -f "bms%04g" 1 448) room=201 --overwrite

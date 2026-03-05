@@ -58,7 +58,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data-dir",
-        default="/llm_workspace_1P/fdd/workspace/workspace/datasets/C3_LVM",
+        default="/llm_workspace_1P/fdd/workspace/datasets/C3_LVM",
     )
     parser.add_argument(
         "--datasets",
