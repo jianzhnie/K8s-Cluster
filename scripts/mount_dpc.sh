@@ -104,7 +104,30 @@ run_host() {
   return 1
 }
 
-export -f run_host
+# Function to verify mount status
+check_mount() {
+  local ip="$1"
+  local ssh_opts=(
+    -o BatchMode=yes
+    -o ConnectTimeout=10
+    -o ServerAliveInterval=10
+    -o ServerAliveCountMax=3
+    -o StrictHostKeyChecking=no
+    -o UserKnownHostsFile=/dev/null
+    -o LogLevel=ERROR
+  )
+  
+  # Check if mountpoint exists in /proc/mounts or mount command output
+  if ssh "${ssh_opts[@]}" "$ip" "mount | grep -q \" $REMOTE_MOUNTPOINT \"" >/dev/null 2>&1; then
+    echo "MOUNT_OK $ip"
+    return 0
+  else
+    echo "MOUNT_FAIL $ip"
+    return 1
+  fi
+}
+
+export -f run_host check_mount
 export REMOTE_MOUNTPOINT REMOTE_UMOUNT_PATHS RETRIES
 
 # Function to check SSH connectivity
@@ -161,26 +184,26 @@ if [[ "${#IPS[@]}" -eq 0 ]]; then
 fi
 
 echo ""
-echo "[INFO] Starting mount on ${#IPS[@]} reachable hosts (Parallel: $PARALLEL, Retries: $RETRIES)..."
-echo "[INFO] Target Mountpoint: $REMOTE_MOUNTPOINT"
+echo "[INFO] Verifying mount status on ${#IPS[@]} hosts..."
 
-# Run in parallel using xargs
-# Use file descriptor 3 to capture output while preserving order/integrity
+# Check mount status in parallel
 exec 3>&1
-OUTPUT="$(
-  printf '%s\n' "${IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'run_host "$1"' _ | tee /dev/fd/3
+MOUNT_CHECK_OUTPUT="$(
+  printf '%s\n' "${IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'check_mount "$1"' _ | tee /dev/fd/3
 )"
 
-# Calculate statistics
-total=$(echo "$OUTPUT" | grep -cE '^(OK|FAIL) ' || true)
-ok=$(echo "$OUTPUT" | grep -c '^OK ' || true)
-fail=$(echo "$OUTPUT" | grep -c '^FAIL ' || true)
+MOUNT_OK_COUNT=$(echo "$MOUNT_CHECK_OUTPUT" | grep -c '^MOUNT_OK' || true)
+MOUNT_FAIL_COUNT=$(echo "$MOUNT_CHECK_OUTPUT" | grep -c '^MOUNT_FAIL' || true)
 
 echo ""
-echo "[INFO] Summary: Total=$total, OK=$ok, Fail=$fail"
+echo "[INFO] Verification Summary: OK=$MOUNT_OK_COUNT, FAIL=$MOUNT_FAIL_COUNT"
+
+if [[ "$MOUNT_FAIL_COUNT" -ne 0 ]]; then
+  echo "[ERROR] Hosts with mount failure:" >&2
+  echo "$MOUNT_CHECK_OUTPUT" | grep '^MOUNT_FAIL' | awk '{print $2}' >&2
+  exit 2
+fi
 
 if [[ "$fail" -ne 0 ]]; then
-  echo "[ERROR] Failed hosts:" >&2
-  echo "$OUTPUT" | awk '/^FAIL /{print $2}' >&2
   exit 2
 fi
