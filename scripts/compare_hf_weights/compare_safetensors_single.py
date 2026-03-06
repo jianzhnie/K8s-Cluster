@@ -101,13 +101,12 @@ def compare_safetensors(file1_path,
 
     if key is not None:
         if key not in keys1 and key not in keys2:
-            logger.error(
-                f"\n[MISMATCH] Key missing in both files:\n  - {key}")
+            logger.error(f'\n[MISMATCH] Key missing in both files:\n  - {key}')
             sys.exit(1)
         if key not in keys1:
             val = f2.get_tensor(key)
             logger.error(
-                f"\n[MISMATCH] Key present in File 2 but missing in File 1:\n  - {key}"
+                f'\n[MISMATCH] Key present in File 2 but missing in File 1:\n  - {key}'
             )
             logger.error(f'    Shape: {val.shape}')
             logger.error(f'    Value: {val}')
@@ -115,7 +114,7 @@ def compare_safetensors(file1_path,
         if key not in keys2:
             val = f1.get_tensor(key)
             logger.error(
-                f"\n[MISMATCH] Key present in File 1 but missing in File 2:\n  - {key}"
+                f'\n[MISMATCH] Key present in File 1 but missing in File 2:\n  - {key}'
             )
             logger.error(f'    Shape: {val.shape}')
             logger.error(f'    Value: {val}')
@@ -238,10 +237,9 @@ if __name__ == '__main__':
     parser.add_argument('--verbose',
                         action='store_true',
                         help='Print details for matching tensors too')
-    parser.add_argument(
-        '--key',
-        default=None,
-        help='Only compare a single tensor key (exact match)')
+    parser.add_argument('--key',
+                        default=None,
+                        help='Only compare a single tensor key (exact match)')
 
     args = parser.parse_args()
 
