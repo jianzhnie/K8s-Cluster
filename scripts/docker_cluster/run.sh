@@ -68,16 +68,16 @@ PIDS=()
 for node in "${NODE_HOSTS[@]}"; do
     (
         log "INFO" "  -> 正在处理节点: $node"
-        
+
         # 2.1 创建远程临时目录
         ssh -o StrictHostKeyChecking=no "$node" "mkdir -p /tmp/k8s_cluster_scripts"
-        
+
         # 2.2 传输启动脚本
         if ! scp -o StrictHostKeyChecking=no "$START_DOCKER_SCRIPT" "$node:/tmp/k8s_cluster_scripts/start_docker_image.sh"; then
             log "ERROR" "  -> [Failed] 无法拷贝脚本到节点 $node"
             exit 1
         fi
-        
+
         # 2.3 远程执行启动脚本
         # 使用 EOF 块传递环境变量并执行
         ssh -o StrictHostKeyChecking=no "$node" "bash -s" <<EOF
@@ -88,12 +88,12 @@ for node in "${NODE_HOSTS[@]}"; do
             export NPUS='$NPUS'
             export SHARE_PATH_HOST='$SHARE_PATH_HOST'
             export SHARE_PATH_CONTAINER='$SHARE_PATH_CONTAINER'
-            
+
             # 加载并执行 start_docker 函数
             source /tmp/k8s_cluster_scripts/start_docker_image.sh
             start_docker
 EOF
-        
+
         if [ $? -eq 0 ]; then
             log "INFO" "  -> [Success] 节点 $node Docker 容器就绪"
         else

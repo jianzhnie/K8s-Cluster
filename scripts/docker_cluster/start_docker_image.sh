@@ -35,7 +35,7 @@ log() {
 
 load_images() {
     log "info" "[start] Loading ${IMAGE_NAME}:${IMAGE_TAG} image"
-    
+
     if [[ ! -f "$IMAGE_PATH" ]]; then
         log "error" "Image file not found at: $IMAGE_PATH"
         return 1
@@ -46,7 +46,7 @@ load_images() {
         log "info" "[success] Image loaded successfully using docker load"
         return 0
     fi
-    
+
     log "warn" "docker load failed, trying docker import..."
     # 备选 docker import (适用于文件系统归档)
     if ! docker import "$IMAGE_PATH" "$IMAGE_NAME:$IMAGE_TAG"; then
@@ -65,13 +65,13 @@ start_docker() {
 
   log "info" "[start] Start lifting the training container"
 
-  
+
   # 1. 检查 docker 服务是否正常运行
   if ! docker info &> /dev/null; then
     log "error" "Docker is not running. Please start Docker manually."
     return 1
   fi
-  
+
   # 2. 检查 docker 镜像是否存在
   if docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" &> /dev/null; then
     log "info" "${IMAGE_NAME}:${IMAGE_TAG} model image exists"
@@ -87,7 +87,7 @@ start_docker() {
   fi
 
   log "info" "Set Docker container startup parameters"
-  
+
   # 4. 构建 NPU 设备参数
   local device_args=()
   if [ -n "$NPUS" ]; then
@@ -145,7 +145,7 @@ start_docker() {
   docker_run_cmd+=("${IMAGE_NAME}:${IMAGE_TAG}" /bin/bash)
 
   log "info" "Start the container with command: ${docker_run_cmd[*]}"
-  
+
   # 启动docker容器
   if "${docker_run_cmd[@]}"; then
     log "info" "[success] The container ${CONTAINER_NAME} is successfully started"
