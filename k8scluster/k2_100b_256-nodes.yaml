@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: reset-config-robin-kimi2-1t-128-nodes # The value of JobName must be the same as the name attribute of the following job. The prefix fault-config- cannot be modified.
+  name: reset-config-robin-kimi2-100b-256-nodes # The value of JobName must be the same as the name attribute of the following job. The prefix fault-config- cannot be modified.
   namespace: default # Name Space must be set to "default"
   labels:
     reset: "true"
@@ -15,7 +15,7 @@ data:
 apiVersion: mindxdl.gitee.com/v1
 kind: AscendJob
 metadata:
-  name: robin-kimi2-1t-128-nodes
+  name: robin-kimi2-100b-256-nodes
   labels:
     framework: pytorch
     ring-controller.atlas: ascend-910b
@@ -56,7 +56,7 @@ spec:
                       - key: job-name
                         operator: In
                         values:
-                          - robin-kimi2-1t-128-nodes
+                          - robin-kimi2-100b-256-nodes
                   topologyKey: kubernetes.io/hostname
           nodeSelector:
             fdd-label: full-super-node
@@ -96,9 +96,9 @@ spec:
                 - -c
               args:
                 - |
-                  cd /llm_workspace_1P/robin/MindSpeed-LLM;
-                  chmod +x scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh
+                  cd /job/code;
+                  chmod +x scripts/kimi2_100b_4k_k8s_full_dataset_mfu33.sh;
+                  bash scripts/kimi2_100b_4k_k8s_full_dataset_mfu33.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -112,8 +112,12 @@ spec:
                 requests:
                   huawei.com/Ascend910: 8
               volumeMounts:
-                - name: workspace
-                  mountPath: /llm_workspace_1P
+                - name: code
+                  mountPath: /job/code
+                - name: data
+                  mountPath: /job/data
+                - name: fdd
+                  mountPath: /job/fdd
                 - name: ascend-driver
                   mountPath: /usr/local/Ascend/driver
                 - name: dshm
@@ -125,35 +129,19 @@ spec:
                   readOnly: true
                 - name: ranktable # if ranktable is needed please set volume
                   mountPath: /user/serverid/devindex/config
-                - name: ascend-add-ons
-                  mountPath: /usr/local/Ascend/add-ons
-                - name: dcmi
-                  mountPath: /usr/local/dcmi
-                - name: npu-smi
-                  mountPath: /usr/local/bin/npu-smi
-                - name: ascend-install-info
-                  mountPath: /etc/ascend_install.info
-                - name: root-cache
-                  mountPath: /root/.cache
-                - name: davinci-manager
-                  mountPath: /dev/davinci_manager
-                - name: devmm-svm
-                  mountPath: /dev/devmm_svm
-                - name: hisi-hdc
-                  mountPath: /dev/hisi_hdc
-                - name: hccn-tool
-                  mountPath: /usr/local/Ascend/driver/tools/hccn_tool
-                - name: driver-lib64
-                  mountPath: /usr/local/Ascend/driver/lib64
-                - name: version-info
-                  mountPath: /usr/local/Ascend/driver/version.info
           volumes:
             - name: reset-config
               hostPath:
-                path: /user/restore/reset/default.reset-config-robin-kimi2-1t-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
-            - name: workspace
+                path: /user/restore/reset/default.reset-config-robin-kimi2-100b-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
+            - name: code
               hostPath:
-                path: /llm_workspace_1P
+                path: /llm_workspace_1P/robin/MindSpeed-LLM
+            - name: data
+              hostPath:
+                path: /llm_workspace_1P/robin/hfhub/
+            - name: fdd
+              hostPath:
+                path: /llm_workspace_1P/fdd/workspace/
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
@@ -165,43 +153,10 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /llm_workspace_1P/ranktable/default.robin-kimi2-1t-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /llm_workspace_1P/ranktable/default.robin-kimi2-100b-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory
-            - name: ascend-add-ons
-              hostPath:
-                path: /usr/local/Ascend/add-ons
-            - name: dcmi
-              hostPath:
-                path: /usr/local/dcmi
-            - name: npu-smi
-              hostPath:
-                path: /usr/local/bin/npu-smi
-            - name: ascend-install-info
-              hostPath:
-                path: /etc/ascend_install.info
-            - name: root-cache
-              hostPath:
-                path: /root/.cache
-            - name: davinci-manager
-              hostPath:
-                path: /dev/davinci_manager
-            - name: devmm-svm
-              hostPath:
-                path: /dev/devmm_svm
-            - name: hisi-hdc
-              hostPath:
-                path: /dev/hisi_hdc
-            - name: hccn-tool
-              hostPath:
-                path: /usr/local/Ascend/driver/tools/hccn_tool
-            - name: driver-lib64
-              hostPath:
-                path: /usr/local/Ascend/driver/lib64
-            - name: version-info
-              hostPath:
-                path: /usr/local/Ascend/driver/version.info
     Worker:
-      replicas: 127
+      replicas: 255
       restartPolicy: Never
       template:
         metadata:
@@ -218,7 +173,7 @@ spec:
                       - key: job-name
                         operator: In
                         values:
-                          - robin-kimi2-1t-128-nodes
+                          - robin-kimi2-100b-256-nodes
                   topologyKey: kubernetes.io/hostname
           nodeSelector:
             fdd-label: full-super-node
@@ -258,9 +213,9 @@ spec:
                 - -c
               args:
                 - |
-                  cd /llm_workspace_1P/robin/MindSpeed-LLM;
-                  chmod +x scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_kimi2_1t_4k_A3_ptd.sh
+                  cd /job/code;
+                  chmod +x scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh;
+                  bash scripts/k8s_pretrain_kimi2_1000b_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -274,8 +229,12 @@ spec:
                 requests:
                   huawei.com/Ascend910: 8
               volumeMounts:
-                - name: workspace
-                  mountPath: /llm_workspace_1P
+                - name: code
+                  mountPath: /job/code
+                - name: data
+                  mountPath: /job/data
+                - name: fdd
+                  mountPath: /job/fdd
                 - name: ascend-driver
                   mountPath: /usr/local/Ascend/driver
                 - name: dshm
@@ -287,35 +246,19 @@ spec:
                   readOnly: true
                 - name: ranktable # if ranktable is needed please set volume
                   mountPath: /user/serverid/devindex/config
-                - name: ascend-add-ons
-                  mountPath: /usr/local/Ascend/add-ons
-                - name: dcmi
-                  mountPath: /usr/local/dcmi
-                - name: npu-smi
-                  mountPath: /usr/local/bin/npu-smi
-                - name: ascend-install-info
-                  mountPath: /etc/ascend_install.info
-                - name: root-cache
-                  mountPath: /root/.cache
-                - name: davinci-manager
-                  mountPath: /dev/davinci_manager
-                - name: devmm-svm
-                  mountPath: /dev/devmm_svm
-                - name: hisi-hdc
-                  mountPath: /dev/hisi_hdc
-                - name: hccn-tool
-                  mountPath: /usr/local/Ascend/driver/tools/hccn_tool
-                - name: driver-lib64
-                  mountPath: /usr/local/Ascend/driver/lib64
-                - name: version-info
-                  mountPath: /usr/local/Ascend/driver/version.info
           volumes:
             - name: reset-config
               hostPath:
-                path: /user/restore/reset/default.reset-config-robin-kimi2-1t-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
-            - name: workspace
+                path: /user/restore/reset/default.reset-config-robin-kimi2-100b-256-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
+            - name: code
               hostPath:
-                path: /llm_workspace_1P
+                path: /llm_workspace_1P/robin/MindSpeed-LLM
+            - name: data
+              hostPath:
+                path: /llm_workspace_1P/robin/hfhub/
+            - name: fdd
+              hostPath:
+                path: /llm_workspace_1P/fdd/workspace/
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
@@ -327,38 +270,5 @@ spec:
                 path: /etc/localtime
             - name: ranktable
               hostPath:
-                path: /llm_workspace_1P/ranktable/default.robin-kimi2-1t-128-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
+                path: /llm_workspace_1P/ranktable/default.robin-kimi2-100b-256-nodes # need pattern: shared-dir/job-namespace.job-name, the shared-dir should share with ascend-operator
                 type: Directory
-            - name: ascend-add-ons
-              hostPath:
-                path: /usr/local/Ascend/add-ons
-            - name: dcmi
-              hostPath:
-                path: /usr/local/dcmi
-            - name: npu-smi
-              hostPath:
-                path: /usr/local/bin/npu-smi
-            - name: ascend-install-info
-              hostPath:
-                path: /etc/ascend_install.info
-            - name: root-cache
-              hostPath:
-                path: /root/.cache
-            - name: davinci-manager
-              hostPath:
-                path: /dev/davinci_manager
-            - name: devmm-svm
-              hostPath:
-                path: /dev/devmm_svm
-            - name: hisi-hdc
-              hostPath:
-                path: /dev/hisi_hdc
-            - name: hccn-tool
-              hostPath:
-                path: /usr/local/Ascend/driver/tools/hccn_tool
-            - name: driver-lib64
-              hostPath:
-                path: /usr/local/Ascend/driver/lib64
-            - name: version-info
-              hostPath:
-                path: /usr/local/Ascend/driver/version.info

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ~/.bashrc 
+source ~/.bashrc
 
 
 # -----------------------------------------------------------------------------
@@ -23,13 +23,13 @@ LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
 CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
 
 # Rank 0 负责创建目录并备份脚本
-if [[ "${RANK}" -eq 0 ]]; then 
+if [[ "${RANK}" -eq 0 ]]; then
     echo "Initializing directories at $LOG_DIR"
     mkdir -p "$LOG_DIR/plogs"
     mkdir -p "$LOG_DIR/ttplogs"
     mkdir -p "$LOG_DIR/trainlogs"
     mkdir -p "$CKPT_SAVE_DIR"
-    
+
     # Try to copy the script file to the log directory
     if [[ -f "$0" ]]; then
         cp "$0" "$LOG_DIR/"
@@ -220,7 +220,7 @@ fi
 TP=1
 PP=1
 MBS=4
-GBS=1024
+GBS=8192
 SEQ_LENGTH=4096
 TRAIN_ITERS=2000
 SAVE_ITERS=1000
@@ -242,7 +242,7 @@ OPTIMIZE_ARGS="
     --no-masked-softmax-fusion \
     --use-distributed-optimizer \
     --overlap-grad-reduce \
-    --overlap-param-gather 
+    --overlap-param-gather
 "
 
 MODEL_PARALLEL_ARGS="
@@ -318,6 +318,8 @@ TRAIN_FROM_HF="
 
 TRAIN_FROM_MG="
     --data-path $DATA_PREFIXES \
+    --num-dataset-builder-threads 4 \
+    --data-cache-path $CKPT_SAVE_DIR/cache/megatron_indices \
     --split 100,0,0 \
     --save $CKPT_SAVE_DIR \
     --manual-gc \
@@ -332,6 +334,7 @@ OUTPUT_ARGS="
     --eval-iters 0 \
 "
 
+unset HIGH_AVAILABILITY
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $GPT_ARGS \
     $TRAIN_FROM_MG \
@@ -340,4 +343,5 @@ torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $TRAIN_ARGS \
     $MODEL_PARALLEL_ARGS \
     --distributed-backend nccl \
-    --transformer-impl local
+    --transformer-impl local \
+    2>&1 | tee ${TRAIN_LOG_PATH}
