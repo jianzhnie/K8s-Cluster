@@ -21,6 +21,3 @@ nodes=$(seq -f "bms%04g" "$start_num" "$end_num")
 
 # Apply label using xargs to handle list
 echo "$nodes" | xargs kubectl label nodes --overwrite "$label"
-
-
-
