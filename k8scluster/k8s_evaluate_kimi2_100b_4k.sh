@@ -24,7 +24,6 @@ SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
 STRART_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
 
-
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
 CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
@@ -58,6 +57,7 @@ else
 fi
 
 # 定义具体的日志路径
+rm -rf /root/.cache/
 export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
 export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
 export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
@@ -103,32 +103,30 @@ HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 
 # 数据路径配置, 模型路径配置
 TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
-CKPT_LOAD_DIR=""
-DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
+CKPT_LOAD_DIR="/llm_workspace_1P/fdd/workspace/MindSpeed-LLM-0227/MindSpeed-LLM/TrainResults/kimi2-base-100b_4k_k8s_full_dataset_1536_dies/0cf5f907-2ab9-46c0-8eb1-3a0bc5ec2284"
 TASK="mmlu"
-NUM_SAMPLES=1e10
 
 # ===================== ========================================================
 
 # 任务配置
-DEFAULT_DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/mmlu/test/"
+DEFAULT_DATA_PATH="/llm_workspace_1P/robin/hfhub/datasets/benchmark/mmlu/test/"
 DEFAULT_MAX_NEW_TOKEN=32
 
 case "$TASK" in
     "mmlu")
-        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/mmlu/test/"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/datasets/benchmark/mmlu/test/"
         MAX_NEW_TOKEN=2
         ;;
     "bbh")
-        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/bbh/"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/datasets/benchmark/bbh/"
         MAX_NEW_TOKEN=32
         ;;
     "human-eval")
-        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/human-eval"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/datasets/benchmark/human-eval"
         MAX_NEW_TOKEN=1024
         ;;
     "gsm8k")
-        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/gsm8k"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/datasets/benchmark/gsm8k"
         MAX_NEW_TOKEN=512
         ;;
     *)
@@ -181,7 +179,7 @@ PP=4
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=32
+NUM_LAYERS=28
 SEQ_LEN=4096
 MBS=1
 
@@ -294,7 +292,6 @@ EVAL_ARGS="
     --no-chat-template \
     --use-kv-cache \
     --evaluation-batch-size 1 \
-    --max-eval-samples ${NUM_SAMPLES} \
 "
 
 unset HIGH_AVAILABILITY

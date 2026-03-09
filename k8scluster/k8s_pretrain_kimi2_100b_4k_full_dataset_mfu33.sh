@@ -223,7 +223,7 @@ PP=4
 EP=32
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=32
+NUM_LAYERS=28
 SEQ_LEN=4096
 MBS=1
 GBS=65536
@@ -313,7 +313,6 @@ GPT_ARGS="
     --recompute-granularity full \
     --recompute-method block \
     --recompute-num-layers 4 \
-    --noop-layers 7,15,23,31 \
     --expert-tensor-parallel-size 1 \
     --no-shared-storage \
     --use-distributed-optimizer \
