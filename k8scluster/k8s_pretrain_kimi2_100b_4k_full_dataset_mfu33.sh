@@ -378,7 +378,6 @@ DATA_ARGS="
 CKPT_ARGS="
     --no-load-optim \
     --no-load-rng \
-    --load ${CKPT_LOAD_DIR} \
     --save ${CKPT_SAVE_DIR} \
     --manual-gc \
     --manual-gc-interval 50 \
