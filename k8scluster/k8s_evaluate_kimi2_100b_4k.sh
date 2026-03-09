@@ -18,11 +18,12 @@ source ~/.bashrc
 : "${MINDX_TASK_ID:?MINDX_TASK_ID is required}"
 : "${XDL_IP:?XDL_IP is required}"
 
-OUTPUT_DIR="/job/data/output"
+OUTPUT_DIR="/llm_workspace_1P/robin/hfhub/output"
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
-STRART_SCRIPT="/job/code/scripts/${SCRIPT_NAME}"
+STRART_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
+
 
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
@@ -101,34 +102,33 @@ MG_SAVE_DIR="$CKPT_SAVE_DIR/mcore"
 HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 
 # 数据路径配置, 模型路径配置
-TOKENIZER_PATH="/job/data/models/moonshotai/Kimi-K2-Base"
+TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR=""
-DATA_PREFIX_FILE="/job/data/datasets/data_prefixes.txt"
-DATA_DIR="/job/fdd/datasets/C3_LVM/all_preprocessed_datasets"
-DATA_NAME_PATTERN="part*"
+DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
 TASK="mmlu"
 NUM_SAMPLES=1e10
-# =============================================================================
+
+# ===================== ========================================================
 
 # 任务配置
-DEFAULT_DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/data/benchmark/mmlu/test/"
+DEFAULT_DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/mmlu/test/"
 DEFAULT_MAX_NEW_TOKEN=32
 
 case "$TASK" in
     "mmlu")
-        DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/data/benchmark/mmlu/test/"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/mmlu/test/"
         MAX_NEW_TOKEN=2
         ;;
     "bbh")
-        DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/data/benchmark/bbh/"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/bbh/"
         MAX_NEW_TOKEN=32
         ;;
     "human-eval")
-        DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/data/benchmark/human-eval"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/human-eval"
         MAX_NEW_TOKEN=1024
         ;;
     "gsm8k")
-        DATA_PATH="/mnt/yWXKUIzKaqvtk0rLm/model_train/data/benchmark/gsm8k"
+        DATA_PATH="/llm_workspace_1P/robin/hfhub/data/data/benchmark/gsm8k"
         MAX_NEW_TOKEN=512
         ;;
     *)
@@ -170,7 +170,6 @@ else
       exit 1
     fi
 fi
-
 
 
 
@@ -286,10 +285,11 @@ GPT_ARGS="
 EVAL_ARGS="
     --task ${TASK} \
     --task-data-path ${DATA_PATH} \
+    --load ${CKPT_LOAD_DIR} \
     --no-load-optim \
     --no-load-rng \
     --use-mcore-models \
-    --seq-length ${SEQ_LENGTH} \
+    --seq-length ${SEQ_LEN} \
     --max-new-tokens ${MAX_NEW_TOKEN} \
     --no-chat-template \
     --use-kv-cache \
@@ -304,7 +304,7 @@ torchrun $DISTRIBUTED_ARGS evaluation.py \
     $GQA_ARGS \
     $ROPE_ARGS \
     $MOE_ARGS \
-    $OUTPUT_ARGS \
     $EVAL_ARGS \
     --distributed-backend nccl \
+    --transformer-impl local \
     2>&1 | tee ${TRAIN_LOG_PATH}
