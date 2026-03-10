@@ -167,6 +167,40 @@ resources:
 | `limits/requests`      | 固定为相同值以实现独占卡，避免超售导致性能问题。 |
 
 **5. 存储挂载 (Volumes)**
+
+在 Kubernetes (K8s) 的 Pod 定义中，`volumes` 和 `volumeMounts` 是配合使用的，它们共同决定了数据如何存储以及容器如何访问这些数据。
+
+简单来说：
+*   **`volumes` (Pod 级别)**：**定义“数据在哪”**。它声明了有哪些存储卷可用，以及它们的具体类型（是宿主机目录、临时内存、还是网络存储）。
+*   **`volumeMounts` (Container 级别)**：**定义“数据挂哪”**。它决定了上述定义的卷应该出现在容器内部的哪个文件路径下。
+
+### 结合您的配置文件说明
+
+#### 1. 定义卷 (volumes)
+在 `spec.template.spec.volumes` 下，定义了一个名为 `workspace` 的卷，类型是 `hostPath`（宿主机路径）。
+```yaml
+          volumes:
+            - name: workspace         # 卷的名字，用于被引用
+              hostPath:
+                path: /llm_workspace_1P # 物理机（宿主机）上的实际路径
+```
+**含义**：告诉 K8s，我有一个叫 `workspace` 的存储卷，它对应的就是物理机上的 `/llm_workspace_1P` 目录。
+
+#### 2. 挂载卷 (volumeMounts)
+在 `spec.template.spec.containers.volumeMounts` 下，容器声明使用这个卷。
+```yaml
+              volumeMounts:
+                - name: workspace       # 引用上面定义的卷名字
+                  mountPath: /llm_workspace_1P # 容器内部的路径
+```
+**含义**：把上面那个叫 `workspace` 的卷，挂载到容器里面的 `/llm_workspace_1P` 目录下。
+
+### 总结
+*   **如果不写 `volumes`**：K8s 不知道数据源在哪里。
+*   **如果不写 `volumeMounts`**：虽然有数据源，但容器里看不见，无法访问。
+*   **两者配合**：打通了 **物理机路径 (`/llm_workspace_1P`)** <--> **容器内路径 (`/llm_workspace_1P`)** 的通道，让容器能直接读写物理机上的文件。
+*
+### 3. 挂载其他必要卷
 *   `/job/code`, `/job/data`: 挂载代码和数据集。
 *   `/usr/local/Ascend/driver`: **必须**。挂载宿主机的 NPU 驱动。
 *   `/dev/shm`: **必须**。共享内存，PyTorch 多进程通信依赖。
@@ -259,6 +293,9 @@ spec:
         hostPath:
           path: /llm_workspace_1P/train/MindSpeed-LLM # 确保所有节点该路径存在且内容一致
     ```
+
+
+
 
 ### 3.3 多机配置实战步骤 (以双机 16 卡为例)
 

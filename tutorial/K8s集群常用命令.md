@@ -18,6 +18,12 @@
       - [3. 查找打过特定 Label 的节点](#3-查找打过特定-label-的节点)
       - [4. 查找 Pod 的 Label](#4-查找-pod-的-label)
   - [3. Pod 与容器管理](#3-pod-与容器管理)
+    - [3.1 查找特定 Pod 使用的节点](#31-查找特定-pod-使用的节点)
+      - [1. 知道 Pod 名字（最常用）](#1-知道-pod-名字最常用)
+      - [2. 只想获取节点名称（方便脚本用）](#2-只想获取节点名称方便脚本用)
+      - [3. 不知道命名空间（全局搜索）](#3-不知道命名空间全局搜索)
+      - [4. 通过标签查找](#4-通过标签查找)
+      - [组合用法示例](#组合用法示例)
   - [4. 工作负载 (Deployments/Jobs)](#4-工作负载-deploymentsjobs)
   - [5. 网络与服务](#5-网络与服务)
   - [6. 配置与存储](#6-配置与存储)
@@ -356,6 +362,53 @@ kubectl get pods --show-labels -A
 | `kubectl delete pod <name>`                   | 删除 Pod                              | `kubectl delete pod my-pod --grace-period=0`  |
 
 ---
+### 3.1 查找特定 Pod 使用的节点
+
+查找特定 Pod 使用的节点，通常有这几种场景：
+
+#### 1. 知道 Pod 名字（最常用）
+如果你的 Pod 名字是 `my-pod-name`，直接用 `-o wide` 查看：
+
+```bash
+kubectl get pod <pod-name> -o wide
+# 输出示例：
+# NAME          READY   STATUS    RESTARTS   AGE   IP           NODE
+# my-pod-name   1/1     Running   0          5m    10.244.1.5   node-1
+```
+
+#### 2. 只想获取节点名称（方便脚本用）
+如果你只想提取节点的名字，不想看其他信息：
+
+```bash
+kubectl get pod <pod-name> -o custom-columns=NODE:.spec.nodeName --no-headers
+# 或者用 jsonpath
+kubectl get pod <pod-name> -o jsonpath='{.spec.nodeName}'
+```
+
+#### 3. 不知道命名空间（全局搜索）
+如果你只知道 Pod 名字，但不知道它在哪个 Namespace：
+
+```bash
+kubectl get pods -A --field-selector=metadata.name=<pod-name> -o wide
+```
+
+#### 4. 通过标签查找
+如果你有一组 Pod（比如 Deployment 生成的），想看它们都在哪些节点上：
+
+```bash
+kubectl get pods -l app=nginx -o wide
+```
+
+#### 组合用法示例
+如果你想给**运行特定 Pod 的节点**打标签：
+
+```bash
+# 例如给运行 my-app 的所有节点打上专用标签
+kubectl get pods -l app=my-app -o jsonpath='{.items[*].spec.nodeName}' \
+  | tr ' ' '\n' | sort | uniq \
+  | xargs -I {} kubectl label node {} app=my-app-node --overwrite
+```
+
 
 ## 4. 工作负载 (Deployments/Jobs)
 管理应用副本、滚动更新与批处理任务。
