@@ -7,7 +7,9 @@
   - [目录](#目录)
   - [1. 基础配置与环境](#1-基础配置与环境)
   - [2. 集群与节点管理](#2-集群与节点管理)
+    - [获取集群所有节点名](#获取集群所有节点名)
     - [2.1 给节点打Label](#21-给节点打label)
+    - [2.1.1 批量给节点打 Label](#211-批量给节点打-label)
     - [2.2 标记坏节点并禁止调度](#22-标记坏节点并禁止调度)
       - [使用实例-给节点打污点](#使用实例-给节点打污点)
     - [2.3 查看所有节点的 Label](#23-查看所有节点的-label)
@@ -59,7 +61,27 @@
 | `kubectl drain <node>`          | 驱逐节点上的 Pod (维护前清空)   | `kubectl drain bms1889 --ignore-daemonsets` |
 
 
-### 2.1 给节点打Label 
+### 获取集群所有节点名
+
+使用下面任意一种方式只取第一列（节点名），并去掉表头：
+
+```bash
+kubectl get node --no-headers | awk '{print $1}'
+```
+
+更稳妥（不依赖列宽/对齐）的写法：
+
+```bash
+kubectl get node -o name | cut -d/ -f2
+```
+
+或者：
+
+```bash
+kubectl get node --no-headers -o custom-columns=NAME:.metadata.name
+```
+
+### 2.1 给节点打Label
 
 在 k8s 集群中，给节点打 Label 是一种常见的操作，用于对节点进行分类、标识或分组。使用 `kubectl label node` 命令可以给节点添加标签。下面的脚本提供了批量给节点打 Label 的方法。
 
@@ -100,6 +122,41 @@ bash scripts/labeled_nodes.sh bms0001 bms0448 <key>=<value>
 ```bash
 kubectl label nodes $(seq -f "bms%04g" 1 448) <key>=<value> --overwrite
 ```
+
+### 2.1.1 批量给节点打 Label
+
+把“取出集群节点名”和“批量打标签”合在一起，推荐用 `xargs` 这一版（会自动用当前集群里真实存在的节点名）：
+
+- 正式执行
+```bash
+kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name \
+  | xargs -r -n1 -I{} kubectl label node {} robin-label=full-super-node --overwrite
+```
+
+- 先做服务端 dry-run 预览
+```bash
+kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name \
+  | xargs -r -n1 -I{} kubectl label node {} robin-label=full-super-node --overwrite --dry-run=server -o yaml
+```
+
+- 只给 bms 格式节点打标签（可选）
+```bash
+kubectl get nodes -o name \
+  | cut -d/ -f2 \
+  | grep -E '^bms[0-9]{4}$' \
+  | xargs -r -n1 -I{} kubectl label node {} robin-label=full-super-node --overwrite
+```
+
+- 不用 xargs、用命令替换（节点数很多时可能较慢）
+```bash
+kubectl label node $(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name) robin-label=full-super-node --overwrite
+```
+
+要点：
+- 使用 -I{} 明确把节点名插入到资源位置（在标签键值之前）。
+- 使用 -n1 保证每次调用只处理一个节点，避免参数拼接问题。
+- 保留 --overwrite；预览时加 --dry-run=server -o yaml。
+
 
 **验证标签是否打上：**
 
