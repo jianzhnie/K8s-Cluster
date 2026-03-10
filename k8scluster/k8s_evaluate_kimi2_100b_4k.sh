@@ -105,6 +105,7 @@ HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR="/llm_workspace_1P/fdd/workspace/MindSpeed-LLM-0227/MindSpeed-LLM/TrainResults/kimi2-base-100b_4k_k8s_full_dataset_1536_dies/0cf5f907-2ab9-46c0-8eb1-3a0bc5ec2284"
 TASK="mmlu"
+: "${CKPT_LOAD_DIR:?CKPT_LOAD_DIR is required}"
 
 # ===================== ========================================================
 
@@ -132,14 +133,17 @@ case "$TASK" in
     *)
         # 匹配到未知 TASK 值时的容错处理
         echo "警告：未知的 TASK 值 '$TASK'，使用默认路径"
-        DATA_PATH=${DEFAULT_DATA_PATH}
-        MAX_NEW_TOKEN=${DEFAULT_MAX_NEW_TOKEN}
+        DATA_PATH="${DATA_PATH:-$DEFAULT_DATA_PATH}"
+        MAX_NEW_TOKEN="${MAX_NEW_TOKEN:-$DEFAULT_MAX_NEW_TOKEN}"
         ;;
 esac
 
-echo "DATA_PATH", $DATA_PATH
+echo "TASK=${TASK}"
+echo "DATA_PATH=${DATA_PATH}"
+echo "MAX_NEW_TOKEN=${MAX_NEW_TOKEN}"
+echo "TOKENIZER_PATH=${TOKENIZER_PATH}"
+echo "CKPT_LOAD_DIR=${CKPT_LOAD_DIR}"
 # =============================================================================
-
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
   export TTP_ADDR=$POD_IP
@@ -254,8 +258,7 @@ GPT_ARGS="
     --tokenizer-name-or-path ${TOKENIZER_PATH} \
     --seq-length ${SEQ_LEN} \
     --max-position-embeddings 131072 \
-    --micro-batch-size 1 \
-    --max-new-tokens 2 \
+    --micro-batch-size ${MBS} \
     --make-vocab-size-divisible-by 1 \
     --untie-embeddings-and-output-weights \
     --disable-bias-linear \
