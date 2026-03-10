@@ -186,6 +186,7 @@ CP_TYPE='ulysses_cp_algo'
 NUM_LAYERS=28
 SEQ_LEN=4096
 MBS=1
+VPP_STAGE=$(( (NUM_LAYERS / PP) / 2 ))
 
 
 DISTRIBUTED_ARGS="
@@ -227,6 +228,12 @@ GQA_ARGS="
     --group-query-attention \
 "
 
+
+DUALPIPE_ARGS="
+    --moe-fb-overlap \
+    --schedules-method dualpipev \
+"
+
 ROPE_ARGS="
     --beta-fast 1 \
     --beta-slow 1 \
@@ -247,6 +254,7 @@ GPT_ARGS="
     --expert-tensor-parallel-size 1 \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --num-layers-per-virtual-pipeline-stage ${VPP_STAGE} \
     --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
@@ -302,6 +310,7 @@ unset HIGH_AVAILABILITY
 torchrun $DISTRIBUTED_ARGS evaluation.py \
     $GPT_ARGS \
     $GQA_ARGS \
+    $DUALPIPE_ARGS \
     $ROPE_ARGS \
     $MOE_ARGS \
     $EVAL_ARGS \

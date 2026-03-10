@@ -18,11 +18,11 @@ source ~/.bashrc
 : "${MINDX_TASK_ID:?MINDX_TASK_ID is required}"
 : "${XDL_IP:?XDL_IP is required}"
 
-OUTPUT_DIR="/job/data/output"
+OUTPUT_DIR="/llm_workspace_1P/robin/hfhub/output"
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
-STRART_SCRIPT="/job/code/scripts/${SCRIPT_NAME}"
+STRART_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
 
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
@@ -57,6 +57,7 @@ else
 fi
 
 # 定义具体的日志路径
+rm -rf /root/.cache/
 export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
 export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
 export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
@@ -101,12 +102,9 @@ MG_SAVE_DIR="$CKPT_SAVE_DIR/mcore"
 HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 
 # 数据路径配置, 模型路径配置
-DATA_PATH="/job/data/datasets/tatsu-lab/alpaca/data/train-00000-of-00001-a09b74b3ef9c3b56.parquet"
-TOKENIZER_PATH="/job/data/models/moonshotai/Kimi-K2-Base"
+TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR=""
-DATA_PREFIX_FILE="/job/data/datasets/data_prefixes.txt"
-DATA_DIR="/job/fdd/datasets/C3_LVM/all_preprocessed_datasets"
-DATA_NAME_PATTERN="part*"
+DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
 # =============================================================================
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
