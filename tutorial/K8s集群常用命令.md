@@ -16,6 +16,7 @@
       - [1. 查看所有节点的 Label](#1-查看所有节点的-label)
       - [2. 统计集群中出现过的所有 Label Key（去重）](#2-统计集群中出现过的所有-label-key去重)
       - [3. 查找打过特定 Label 的节点](#3-查找打过特定-label-的节点)
+    - [2.4 查找“不带特定 Label 的节点”](#24-查找不带特定-label-的节点)
       - [4. 查找 Pod 的 Label](#4-查找-pod-的-label)
   - [3. Pod 与容器管理](#3-pod-与容器管理)
     - [3.1 查找特定 Pod 使用的节点](#31-查找特定-pod-使用的节点)
@@ -339,6 +340,32 @@ kubectl get nodes -l disktype=ssd
 # 查找打过 environment 标签的节点（不管值是什么）
 kubectl get nodes -l environment
 ```
+
+### 2.4 查找“不带特定 Label 的节点”
+
+要找“除了 `kubectl get nodes -l environment` 选出来的那些节点之外的其它节点”（也就是**不带 `environment` 这个 label key** 的节点），直接用 label selector 的“不存在”语法即可：
+
+```bash
+kubectl get nodes -l '!environment'
+```
+
+常用变体：
+
+- 只输出节点名：
+```bash
+kubectl get nodes -l '!environment' -o name
+```
+
+- 同时看一下这些节点的 labels（方便确认确实没打）：
+```bash
+kubectl get nodes -l '!environment' --show-labels
+```
+
+补充：如果你想排除的是“`environment=某个值`”而不是“这个 key 是否存在”，用：
+```bash
+kubectl get nodes -l 'environment!=somevalue'
+```
+
 
 #### 4. 查找 Pod 的 Label
 
