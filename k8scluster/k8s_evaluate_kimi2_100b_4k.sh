@@ -44,20 +44,9 @@ if [[ "${RANK}" -eq 0 ]]; then
         cp "$STRART_SCRIPT" "$LOG_DIR/"
     fi
     printenv > "$LOG_DIR/env_vars.sh"
-else
-    # 其他节点等待 Rank 0 创建目录 (Wait until directory exists)
-    echo "Waiting for directory initialization..."
-    for i in {1..10}; do
-        if [[ -d "$LOG_DIR/trainlogs" ]]; then
-            echo "Directory found."
-            break
-        fi
-        sleep 6
-    done
 fi
 
 # 定义具体的日志路径
-rm -rf /root/.cache/
 export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
 export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
 export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
@@ -88,6 +77,7 @@ export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 # 加载自定义OP 并等待加载完成，提前加载可以减少算子编译时间，避免训练过程中动态编译算子导致的性能问题
 # 自定义OP 加载顺序：GMMOpBuilder, GMMV2OpBuilder, MatmulAddOpBuilder, MoeTokenPermuteOpBuilder, MoeTokenUnpermuteOpBuilder,
 #                 RotaryPositionEmbeddingOpBuilder, GroupMatmulAddOpBuilder
+rm -rf /root/.cache/torch_extensions/py310_cpu/
 python -c "import mindspeed; from mindspeed.op_builder import GMMOpBuilder; GMMOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GMMV2OpBuilder; GMMV2OpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import MatmulAddOpBuilder; MatmulAddOpBuilder().load()" &
@@ -187,6 +177,12 @@ NUM_LAYERS=28
 SEQ_LEN=4096
 MBS=1
 VPP_STAGE=$(( (NUM_LAYERS / PP) / 2 ))
+DP_SIZE=$(( WORLD_SIZE / (TP * PP) ))
+if [[ "${DP_SIZE}" -le 0 ]]; then
+  DP_SIZE=1
+fi
+NUM_MICRO_BATCHES=$(( PP * 2 ))
+GBS=$(( MBS * DP_SIZE * NUM_MICRO_BATCHES ))
 
 
 DISTRIBUTED_ARGS="
@@ -222,6 +218,7 @@ MOE_ARGS="
 "
 
 GQA_ARGS="
+    --kv-channels 64 \
     --qk-layernorm \
     --num-attention-heads 128 \
     --num-query-groups 4 \
@@ -230,7 +227,6 @@ GQA_ARGS="
 
 
 DUALPIPE_ARGS="
-    --moe-fb-overlap \
     --schedules-method dualpipev \
 "
 
@@ -254,7 +250,6 @@ GPT_ARGS="
     --expert-tensor-parallel-size 1 \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
-    --num-layers-per-virtual-pipeline-stage ${VPP_STAGE} \
     --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
@@ -267,6 +262,7 @@ GPT_ARGS="
     --seq-length ${SEQ_LEN} \
     --max-position-embeddings 131072 \
     --micro-batch-size ${MBS} \
+    --global-batch-size ${GBS} \
     --make-vocab-size-divisible-by 1 \
     --untie-embeddings-and-output-weights \
     --disable-bias-linear \

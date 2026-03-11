@@ -282,6 +282,7 @@ SWA_ARGS="
 "
 
 GQA_ARGS="
+    --kv-channels 64 \
     --qk-layernorm \
     --num-attention-heads 128 \
     --num-query-groups 4 \
