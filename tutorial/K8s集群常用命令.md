@@ -16,6 +16,7 @@
       - [1. 查看所有节点的 Label](#1-查看所有节点的-label)
       - [2. 统计集群中出现过的所有 Label Key（去重）](#2-统计集群中出现过的所有-label-key去重)
       - [3. 查找打过特定 Label 的节点](#3-查找打过特定-label-的节点)
+      - [筛选出所有 node 不在特定 pod 下的节点NAME](#筛选出所有-node-不在特定-pod-下的节点name)
     - [2.4 查找“不带特定 Label 的节点”](#24-查找不带特定-label-的节点)
       - [4. 查找 Pod 的 Label](#4-查找-pod-的-label)
   - [3. Pod 与容器管理](#3-pod-与容器管理)
@@ -25,6 +26,7 @@
       - [3. 不知道命名空间（全局搜索）](#3-不知道命名空间全局搜索)
       - [4. 通过标签查找](#4-通过标签查找)
       - [组合用法示例](#组合用法示例)
+    - [3.2 查找特定 Job 运行在哪些节点](#32-查找特定-job-运行在哪些节点)
   - [4. 工作负载 (Deployments/Jobs)](#4-工作负载-deploymentsjobs)
   - [5. 网络与服务](#5-网络与服务)
   - [6. 配置与存储](#6-配置与存储)
@@ -341,6 +343,25 @@ kubectl get nodes -l disktype=ssd
 kubectl get nodes -l environment
 ```
 
+查“打过 `fdd-label` 这个 Label Key 的节点”， 只输出节点名：
+
+```bash
+kubectl get nodes -l fdd-label -o custom-columns=NAME:.metadata.name --no-headers
+```
+
+#### 筛选出所有 node 不在特定 pod 下的节点NAME
+
+筛选出所有 node 不在特定 pod 下的节点NAME
+
+```bash
+comm -23 \
+  <(kubectl get nodes -l fdd-label -o custom-columns=NAME:.metadata.name --no-headers | sort -u) \
+  <(kubectl get pod -A -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName --no-headers \
+    | awk '$1 ~ /^fdd-kimi2-1t-no-recompute-768-nodes/ {print $2}' \
+    | sort -u)
+```
+
+
 ### 2.4 查找“不带特定 Label 的节点”
 
 要找“除了 `kubectl get nodes -l environment` 选出来的那些节点之外的其它节点”（也就是**不带 `environment` 这个 label key** 的节点），直接用 label selector 的“不存在”语法即可：
@@ -435,6 +456,37 @@ kubectl get pods -l app=my-app -o jsonpath='{.items[*].spec.nodeName}' \
   | tr ' ' '\n' | sort | uniq \
   | xargs -I {} kubectl label node {} app=my-app-node --overwrite
 ```
+
+### 3.2 查找特定 Job 运行在哪些节点
+
+可以直接从 Pod 的 `.spec.nodeName` 取出它被调度到哪个节点。
+
+- 直接看 Pod 跑在哪个 Node（含 IP 等信息）：
+
+```bash
+kubectl get pod -n <ns> -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName --no-headers \
+| grep '^kimi2-1t-no-recompute-768-nodes' \
+| awk '{print $2}' | sort -u
+```
+
+如果你不确定这些 Pod 在哪个 namespace，直接全局查并输出去重后的节点列表：
+
+```bash
+kubectl get pod -A \
+  -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,NODE:.spec.nodeName --no-headers \
+| awk '$2 ~ /kimi2-1t-no-recompute-768-nodes/ {print $3}' \
+| sort -u
+```
+
+
+想同时看 “NS / Pod / Node” 对应关系：
+
+```bash
+kubectl get pod -A \
+  -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,NODE:.spec.nodeName --no-headers \
+| awk '$2 ~ /^fdd-kimi2-1t-no-recompute-768-nodes/ {print $1,$2,$3}'
+```
+
 
 
 ## 4. 工作负载 (Deployments/Jobs)
