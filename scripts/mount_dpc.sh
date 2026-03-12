@@ -18,6 +18,9 @@ RETRIES="${RETRIES:-3}"
 REMOTE_MOUNTPOINT="${REMOTE_MOUNTPOINT:-/llm_workspace_1P}"
 # Space-separated list of paths to unmount
 REMOTE_UMOUNT_PATHS="${REMOTE_UMOUNT_PATHS:-/mnt/9w1N7vBPmO3wMAYjqZL /mnt/yWXKUIzKaqvtk0rLm /mnt/model_test /mnt/bigio /mnt/mpi_tools /mnt/case_test /mnt/c3_test}"
+SSH_USER="${SSH_USER:-}"
+SSH_PORT="${SSH_PORT:-}"
+SSH_IDENTITY_FILE="${SSH_IDENTITY_FILE:-}"
 
 # Help message
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -26,6 +29,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "     RETRIES (default: 3)"
     echo "     REMOTE_MOUNTPOINT (default: /llm_workspace_1P)"
     echo "     REMOTE_UMOUNT_PATHS (default: list of old paths to unmount)"
+    echo "     SSH_USER (default: current user)"
+    echo "     SSH_PORT (default: ssh default)"
+    echo "     SSH_IDENTITY_FILE (default: ssh default)"
     exit 0
 fi
 
@@ -40,11 +46,32 @@ if [[ -z "$REMOTE_MOUNTPOINT" ]]; then
     exit 1
 fi
 
+if [[ ! "$PARALLEL" =~ ^[0-9]+$ ]] || [[ "$PARALLEL" -le 0 ]]; then
+    echo "[ERROR] PARALLEL must be a positive integer: $PARALLEL" >&2
+    exit 1
+fi
+
+if [[ ! "$RETRIES" =~ ^[0-9]+$ ]] || [[ "$RETRIES" -le 0 ]]; then
+    echo "[ERROR] RETRIES must be a positive integer: $RETRIES" >&2
+    exit 1
+fi
+
+if [[ -n "$SSH_PORT" ]] && { [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]] || [[ "$SSH_PORT" -le 0 ]]; }; then
+    echo "[ERROR] SSH_PORT must be a positive integer: $SSH_PORT" >&2
+    exit 1
+fi
+
+if [[ -n "$SSH_IDENTITY_FILE" ]] && [[ ! -f "$SSH_IDENTITY_FILE" ]]; then
+    echo "[ERROR] SSH_IDENTITY_FILE not found: $SSH_IDENTITY_FILE" >&2
+    exit 1
+fi
+
 # Function to execute on remote host
 run_host() {
     local ip="$1"
     local attempt=1
-    
+    local target="${SSH_USER:+${SSH_USER}@}${ip}"
+
     # SSH Options
     local ssh_opts=(
         -o BatchMode=yes
@@ -55,17 +82,23 @@ run_host() {
         -o UserKnownHostsFile=/dev/null
         -o LogLevel=ERROR
     )
+    if [[ -n "$SSH_PORT" ]]; then
+        ssh_opts+=(-p "$SSH_PORT")
+    fi
+    if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+        ssh_opts+=(-i "$SSH_IDENTITY_FILE")
+    fi
 
     # Construct the remote command
     local cmd_umount=""
     local cmd_mount=""
-    
+
     # 1. Unmount old paths (ignore errors if not mounted)
     if [[ -n "${REMOTE_UMOUNT_PATHS// }" ]]; then
         # Use 'for' loop on remote side to handle multiple paths
         cmd_umount="for p in $REMOTE_UMOUNT_PATHS; do echo \"[INFO] Unmounting \$p\"; umount -f \"\$p\" >/dev/null 2>&1 || true; done"
     fi
-    
+
     # 2. Create directory and Mount
     # Check mkdir success before mounting
     cmd_mount="mkdir -p \"$REMOTE_MOUNTPOINT\" && "
@@ -74,10 +107,10 @@ run_host() {
 
     while [[ "$attempt" -le "$RETRIES" ]]; do
         local output
-        
+
         # Execute Unmount (if needed)
         if [[ -n "$cmd_umount" ]]; then
-            if output=$(ssh "${ssh_opts[@]}" "$ip" "$cmd_umount" 2>&1); then
+            if output=$(ssh "${ssh_opts[@]}" "$target" "$cmd_umount" 2>&1); then
                 echo "$output" | sed "s/^/[$ip] /"
             else
                 # Unmount failure is usually ignored (or handled by || true inside), but if ssh fails we might want to log
@@ -86,19 +119,19 @@ run_host() {
         fi
 
         # Execute Mount
-        if output=$(ssh "${ssh_opts[@]}" "$ip" "$cmd_mount" 2>&1); then
+        if output=$(ssh "${ssh_opts[@]}" "$target" "$cmd_mount" 2>&1); then
             echo "$output" | sed "s/^/[$ip] /"
             echo "OK $ip"
             return 0
         fi
-        
+
         echo "$output" | sed "s/^/[$ip] [FAIL] /"
-        
+
         # Simple backoff
         sleep "$attempt"
         attempt=$((attempt + 1))
     done
-    
+
     echo "FAIL $ip"
     return 1
 }
@@ -106,6 +139,7 @@ run_host() {
 # Function to verify mount status
 check_mount() {
     local ip="$1"
+    local target="${SSH_USER:+${SSH_USER}@}${ip}"
     local ssh_opts=(
         -o BatchMode=yes
         -o ConnectTimeout=10
@@ -115,9 +149,15 @@ check_mount() {
         -o UserKnownHostsFile=/dev/null
         -o LogLevel=ERROR
     )
-    
+    if [[ -n "$SSH_PORT" ]]; then
+        ssh_opts+=(-p "$SSH_PORT")
+    fi
+    if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+        ssh_opts+=(-i "$SSH_IDENTITY_FILE")
+    fi
+
     # Check if mountpoint exists in /proc/mounts or mount command output
-    if ssh "${ssh_opts[@]}" "$ip" "mount | grep -q \" $REMOTE_MOUNTPOINT \"" >/dev/null 2>&1; then
+    if ssh "${ssh_opts[@]}" "$target" "mount | grep -q \" $REMOTE_MOUNTPOINT \"" >/dev/null 2>&1; then
         echo "MOUNT_OK $ip"
         return 0
     else
@@ -132,6 +172,7 @@ export REMOTE_MOUNTPOINT REMOTE_UMOUNT_PATHS RETRIES
 # Function to check SSH connectivity
 check_ssh() {
     local ip="$1"
+    local target="${SSH_USER:+${SSH_USER}@}${ip}"
     local ssh_opts=(
         -o BatchMode=yes
         -o ConnectTimeout=5
@@ -141,7 +182,13 @@ check_ssh() {
         -o UserKnownHostsFile=/dev/null
         -o LogLevel=ERROR
     )
-    if ssh "${ssh_opts[@]}" "$ip" "exit 0" >/dev/null 2>&1; then
+    if [[ -n "$SSH_PORT" ]]; then
+        ssh_opts+=(-p "$SSH_PORT")
+    fi
+    if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+        ssh_opts+=(-i "$SSH_IDENTITY_FILE")
+    fi
+    if ssh "${ssh_opts[@]}" "$target" "exit 0" >/dev/null 2>&1; then
         echo "SSH_OK $ip"
         return 0
     else
@@ -153,7 +200,10 @@ export -f check_ssh
 
 # Read IPs (ignoring comments and empty lines)
 # Compatible with bash 3.2+ (macOS default) by using array assignment
-ALL_IPS=($(grep -Ehv '^\s*($|#)' "$IP_LIST_FILE" | awk '{print $1}' | sort -u))
+OLD_IFS="$IFS"
+IFS=$'\n'
+ALL_IPS=($(awk 'NF && $1 !~ /^#/ {print $1}' "$IP_LIST_FILE" | sort -u))
+IFS="$OLD_IFS"
 
 if [[ "${#ALL_IPS[@]}" -eq 0 ]]; then
     echo "[ERROR] Empty IP list in: $IP_LIST_FILE" >&2
