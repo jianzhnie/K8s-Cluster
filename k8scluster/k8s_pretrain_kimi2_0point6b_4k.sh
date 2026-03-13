@@ -2,7 +2,7 @@
 set -e
 
 # =============================================================================
-# Kimi2 1000B 4K Training Start Script
+# Kimi2 0.6B 4K Training Start Script
 # 依赖 k8s_common_env.sh 进行基础环境初始化
 # =============================================================================
 
@@ -91,8 +91,6 @@ export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 python -c "import mindspeed; from mindspeed.op_builder import GMMOpBuilder; GMMOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GMMV2OpBuilder; GMMV2OpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import MatmulAddOpBuilder; MatmulAddOpBuilder().load()" &
-python -c "import mindspeed; from mindspeed.op_builder import MoeTokenPermuteOpBuilder; MoeTokenPermuteOpBuilder().load()" &
-python -c "import mindspeed; from mindspeed.op_builder import MoeTokenUnpermuteOpBuilder; MoeTokenUnpermuteOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import RotaryPositionEmbeddingOpBuilder; RotaryPositionEmbeddingOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GroupMatmulAddOpBuilder; GroupMatmulAddOpBuilder().load()"
 # =============================================================================
@@ -105,6 +103,8 @@ HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
 CKPT_LOAD_DIR=""
 DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
+DATA_DIR="${DATA_DIR:-/llm_workspace_1P/robin/hfhub/datasets}"
+DATA_NAME_PATTERN="${DATA_NAME_PATTERN:-part*}"
 # =============================================================================
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
@@ -123,14 +123,14 @@ else
     device_count=${LOCAL_WORLD_SIZE}
     if [[ "${device_count}" -eq 0 ]]; then
       echo "device count is 0, train job failed." | tee -a hccl.log
-      chmod 440 ${output_url}
+      if [[ -n "${output_url:-}" ]]; then chmod 440 "${output_url}"; fi
       exit 1
     fi
     # 获取环境变量中的server_count字段
     server_count=`expr ${WORLD_SIZE} / ${LOCAL_WORLD_SIZE}`
     if [[ "${server_count}" == "" ]]; then
       echo "server count is 0, train job failed." | tee -a hccl.log
-      chmod 440 ${output_url}
+      if [[ -n "${output_url:-}" ]]; then chmod 440 "${output_url}"; fi
       exit 1
     fi
 fi
@@ -184,6 +184,10 @@ prepare_data_prefixes() {
             return 0
         fi
     fi
+    if [ -z "${DATA_DIR:-}" ] || [ -z "${DATA_NAME_PATTERN:-}" ]; then
+        echo "[ERROR] DATA_PREFIX_FILE 不存在或为空时，需要同时设置 DATA_DIR 与 DATA_NAME_PATTERN"
+        return 1
+    fi
     if ! discover_data_prefixes "$DATA_DIR" "$DATA_NAME_PATTERN" DATA_FILES_LIST; then
         return 1
     fi
@@ -216,9 +220,9 @@ fi
 # =============================================================================
 
 
-TP=2
-PP=4
-EP=32
+TP=1
+PP=1
+EP=1
 CP=1
 CP_TYPE='ulysses_cp_algo'
 NUM_LAYERS=28
@@ -229,70 +233,11 @@ TRAIN_ITERS=60000
 SAVE_ITERS=2000
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $LOCAL_WORLD_SIZE \
+    --nproc_per_node $device_count \
     --nnodes $server_count \
     --node_rank $RANK \
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
-"
-
-MLA_ARGS="
-    --multi-latent-attention \
-    --qk-pos-emb-head-dim 64 \
-    --qk-head-dim 128 \
-    --q-lora-rank 1536 \
-    --kv-lora-rank 512 \
-    --v-head-dim 128 \
-    --qk-layernorm \
-    --mla-fa-without-pad \
-"
-
-MOE_ARGS="
-    --moe-grouped-gemm \
-    --moe-token-dispatcher-type alltoall \
-    --use-fused-moe-token-permute-and-unpermute \
-    --moe-permutation-async-comm \
-    --first-k-dense-replace 3 \
-    --moe-layer-freq 1 \
-    --n-shared-experts 1 \
-    --num-experts 128 \
-    --moe-router-topk 2 \
-    --moe-ffn-hidden-size 2048 \
-    --moe-router-load-balancing-type aux_loss \
-    --moe-router-num-groups 8 \
-    --moe-router-group-topk 2 \
-    --moe-router-topk-scaling-factor 2.827 \
-    --moe-aux-loss-coeff 0.001 \
-    --seq-aux \
-    --norm-topk-prob \
-    --moe-router-score-function sigmoid \
-    --moe-router-enable-expert-bias \
-    --moe-router-dtype fp32 \
-    --moe-shared-expert-overlap
-"
-BALANCE_ARGS="
-    --balanced-moe-experts \
-
-"
-
-SWA_ARGS="
-    --swa-windows 128 \
-    --full-attention-layers ${MANUAL_FULL_LAYERS} \
-    --mla-fa-divide-qk \
-"
-
-GQA_ARGS="
-    --kv-channels 64 \
-    --qk-layernorm \
-    --num-attention-heads 128 \
-    --num-query-groups 4 \
-    --group-query-attention \
-"
-
-
-DUALPIPE_ARGS="
-    --moe-fb-overlap \
-    --schedules-method dualpipev \
 "
 
 ROPE_ARGS="
@@ -308,24 +253,26 @@ ROPE_ARGS="
 GPT_ARGS="
     --spec mindspeed_llm.tasks.models.spec.qwen3_spec layer_spec \
     --gemm-gradient-accumulation-fusion \
-    --swap-optimizer \
     --recompute-granularity full \
     --recompute-method block \
     --recompute-num-layers 4 \
-    --expert-tensor-parallel-size 1 \
     --no-shared-storage \
     --use-distributed-optimizer \
     --use-flash-attn \
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
-    --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
     --context-parallel-algo  ${CP_TYPE} \
     --num-layers ${NUM_LAYERS} \
-    --hidden-size 4096 \
-    --ffn-hidden-size 11264 \
+    --hidden-size 1024 \
+    --ffn-hidden-size 3072 \
+    --num-attention-heads 16 \
+    --kv-channels 128 \
+    --qk-layernorm \
+    --group-query-attention \
+    --num-query-groups 8 \
     --tokenizer-type PretrainedFromHF  \
     --tokenizer-name-or-path ${TOKENIZER_PATH} \
     --seq-length ${SEQ_LEN} \
@@ -336,7 +283,6 @@ GPT_ARGS="
     --lr 1.0e-4 \
     --train-iters $TRAIN_ITERS \
     --lr-decay-style cosine \
-    --untie-embeddings-and-output-weights \
     --use-fused-rotary-pos-emb \
     --use-rotary-position-embeddings \
     --use-fused-swiglu \
@@ -398,17 +344,14 @@ PROFILING_ARGS="
     --profile-with-cpu \
     --profile-with-memory \
     --profile-record-shapes \
-    --profile-save-path $log_dir/profiling \
+    --profile-save-path $LOG_DIR/profiling \
 "
 
 unset HIGH_AVAILABILITY
 
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $GPT_ARGS \
-    $GQA_ARGS \
-    $DUALPIPE_ARGS \
     $ROPE_ARGS \
-    $MOE_ARGS \
     $OUTPUT_ARGS \
     $DATA_ARGS \
     $CKPT_ARGS \

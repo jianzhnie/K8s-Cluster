@@ -22,7 +22,7 @@ OUTPUT_DIR="/llm_workspace_1P/robin/hfhub/output"
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
-STRART_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
+START_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
 
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
@@ -40,8 +40,8 @@ if [[ "${RANK}" -eq 0 ]]; then
     if [[ -f "$0" ]]; then
         cp "$0" "$LOG_DIR/"
     else
-        echo "Warning: Could not find script file at $0 to copy, try to copy $STRART_SCRIPT instead."
-        cp "$STRART_SCRIPT" "$LOG_DIR/"
+        echo "Warning: Could not find script file at $0 to copy, try to copy $START_SCRIPT instead."
+        cp "$START_SCRIPT" "$LOG_DIR/"
     fi
     printenv > "$LOG_DIR/env_vars.sh"
 fi
