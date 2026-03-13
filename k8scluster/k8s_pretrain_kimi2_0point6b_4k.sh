@@ -44,16 +44,6 @@ if [[ "${RANK}" -eq 0 ]]; then
         cp "$START_SCRIPT" "$LOG_DIR/"
     fi
     printenv > "$LOG_DIR/env_vars.sh"
-else
-    # 其他节点等待 Rank 0 创建目录 (Wait until directory exists)
-    echo "Waiting for directory initialization..."
-    for i in {1..10}; do
-        if [[ -d "$LOG_DIR/trainlogs" ]]; then
-            echo "Directory found."
-            break
-        fi
-        sleep 6
-    done
 fi
 
 # 定义具体的日志路径
