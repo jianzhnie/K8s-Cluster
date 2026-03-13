@@ -91,6 +91,8 @@ export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 python -c "import mindspeed; from mindspeed.op_builder import GMMOpBuilder; GMMOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GMMV2OpBuilder; GMMV2OpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import MatmulAddOpBuilder; MatmulAddOpBuilder().load()" &
+python -c "import mindspeed; from mindspeed.op_builder import MoeTokenPermuteOpBuilder; MoeTokenPermuteOpBuilder().load()" &
+python -c "import mindspeed; from mindspeed.op_builder import MoeTokenUnpermuteOpBuilder; MoeTokenUnpermuteOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import RotaryPositionEmbeddingOpBuilder; RotaryPositionEmbeddingOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GroupMatmulAddOpBuilder; GroupMatmulAddOpBuilder().load()"
 # =============================================================================
@@ -105,6 +107,7 @@ CKPT_LOAD_DIR=""
 DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
 DATA_DIR="${DATA_DIR:-/llm_workspace_1P/robin/hfhub/datasets}"
 DATA_NAME_PATTERN="${DATA_NAME_PATTERN:-part*}"
+DATA_CACHE_PATH="$DATA_DIR/cache/megatron_indices"
 # =============================================================================
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
@@ -225,20 +228,53 @@ PP=1
 EP=1
 CP=1
 CP_TYPE='ulysses_cp_algo'
-NUM_LAYERS=28
+NUM_LAYERS=22
 SEQ_LEN=4096
 MBS=1
-GBS=65536
+GBS=$(( MBS * TP * PP * EP ))*32
 TRAIN_ITERS=60000
-SAVE_ITERS=2000
+SAVE_ITERS=100
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $device_count \
+    --nproc_per_node $LOCAL_WORLD_SIZE \
     --nnodes $server_count \
     --node_rank $RANK \
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
+
+MOE_ARGS="
+    --moe-grouped-gemm \
+    --moe-token-dispatcher-type alltoall \
+    --use-fused-moe-token-permute-and-unpermute \
+    --moe-permutation-async-comm \
+    --first-k-dense-replace 2 \
+    --moe-layer-freq 1 \
+    --n-shared-experts 1 \
+    --num-experts 16 \
+    --moe-router-topk 2 \
+    --moe-ffn-hidden-size 1792 \
+    --moe-router-load-balancing-type aux_loss \
+    --moe-router-num-groups 8 \
+    --moe-router-group-topk 2 \
+    --moe-router-topk-scaling-factor 2.827 \
+    --moe-aux-loss-coeff 0.001 \
+    --seq-aux \
+    --norm-topk-prob \
+    --moe-router-score-function sigmoid \
+    --moe-router-enable-expert-bias \
+    --moe-router-dtype fp32 \
+    --moe-shared-expert-overlap
+"
+
+GQA_ARGS="
+    --kv-channels 64 \
+    --qk-layernorm \
+    --num-attention-heads 28 \
+    --num-query-groups 7 \
+    --group-query-attention \
+"
+
 
 ROPE_ARGS="
     --beta-fast 1 \
@@ -252,7 +288,6 @@ ROPE_ARGS="
 
 GPT_ARGS="
     --spec mindspeed_llm.tasks.models.spec.qwen3_spec layer_spec \
-    --gemm-gradient-accumulation-fusion \
     --recompute-granularity full \
     --recompute-method block \
     --recompute-num-layers 4 \
@@ -262,17 +297,13 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --expert-model-parallel-size ${EP} \
     --sequence-parallel \
     --context-parallel-size ${CP} \
     --context-parallel-algo  ${CP_TYPE} \
     --num-layers ${NUM_LAYERS} \
-    --hidden-size 1024 \
-    --ffn-hidden-size 3072 \
-    --num-attention-heads 16 \
-    --kv-channels 128 \
-    --qk-layernorm \
-    --group-query-attention \
-    --num-query-groups 8 \
+    --hidden-size 1792 \
+    --ffn-hidden-size 5376 \
     --tokenizer-type PretrainedFromHF  \
     --tokenizer-name-or-path ${TOKENIZER_PATH} \
     --seq-length ${SEQ_LEN} \
@@ -315,7 +346,7 @@ GPT_ARGS="
 
 DATA_ARGS="
     --data-path $DATA_PREFIXES \
-    --data-cache-path $CKPT_SAVE_DIR/cache/megatron_indices \
+    --data-cache-path $DATA_CACHE_PATH \
     --split 100,0,0 \
 "
 
@@ -351,6 +382,8 @@ unset HIGH_AVAILABILITY
 
 torchrun $DISTRIBUTED_ARGS pretrain_gpt.py \
     $GPT_ARGS \
+    $MOE_ARGS \
+    $GQA_ARGS \
     $ROPE_ARGS \
     $OUTPUT_ARGS \
     $DATA_ARGS \
