@@ -12,11 +12,11 @@ source ~/.bashrc
 : "${MINDX_TASK_ID:?MINDX_TASK_ID is required}"
 : "${XDL_IP:?XDL_IP is required}"
 
-OUTPUT_DIR="/job/data/output"
+OUTPUT_DIR="/llm_workspace_1P/robin/hfhub/output"
 DATETIME=$(date +%Y-%m-%d_%H-%M-%S)
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_PREFIX="${SCRIPT_NAME%.sh}"
-START_SCRIPT="/job/code/scripts/${SCRIPT_NAME}"
+START_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
 
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
@@ -38,23 +38,13 @@ if [[ "${RANK}" -eq 0 ]]; then
         cp "$START_SCRIPT" "$LOG_DIR/"
     fi
     printenv > "$LOG_DIR/env_vars.sh"
-else
-    # 其他节点等待 Rank 0 创建目录 (Wait until directory exists)
-    echo "Waiting for directory initialization..."
-    for i in {1..10}; do
-        if [[ -d "$LOG_DIR/trainlogs" ]]; then
-            echo "Directory found."
-            break
-        fi
-        sleep 6
-    done
 fi
 
 # 定义具体的日志路径
+rm -rf /root/.cache/
 export ASCEND_PROCESS_LOG_PATH="$LOG_DIR/plogs/rank-${RANK}_${XDL_IP}"
 export TTP_LOG_PATH="$LOG_DIR/ttplogs/rank-${RANK}_${XDL_IP}"
 export TRAIN_LOG_PATH="$LOG_DIR/trainlogs/rank-${RANK}_${XDL_IP}.log"
-
 
 # -----------------------------------------------------------------------------
 # 2. 训练环境与网络配置
@@ -71,7 +61,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 export HCCL_CONNECT_TIMEOUT=3600
 export HCCL_BUFFSIZE=400
-export TASK_QUEUE_ENABLE=1
+export TASK_QUEUE_ENABLE=2
 export NPU_ASD_ENABLE=0
 export STREAMS_PER_DEVICE=32
 export HCCL_OP_BASE_FFTS_MODE=TRUE
@@ -82,6 +72,7 @@ export HCCL_ALGO="alltoall=level0:NA;level1:pipeline"
 # 加载自定义OP 并等待加载完成，提前加载可以减少算子编译时间，避免训练过程中动态编译算子导致的性能问题
 # 自定义OP 加载顺序：GMMOpBuilder, GMMV2OpBuilder, MatmulAddOpBuilder, MoeTokenPermuteOpBuilder, MoeTokenUnpermuteOpBuilder,
 #                 RotaryPositionEmbeddingOpBuilder, GroupMatmulAddOpBuilder
+rm -rf /root/.cache/torch_extensions/py310_cpu/
 python -c "import mindspeed; from mindspeed.op_builder import GMMOpBuilder; GMMOpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import GMMV2OpBuilder; GMMV2OpBuilder().load()" &
 python -c "import mindspeed; from mindspeed.op_builder import MatmulAddOpBuilder; MatmulAddOpBuilder().load()" &
@@ -91,18 +82,17 @@ python -c "import mindspeed; from mindspeed.op_builder import RotaryPositionEmbe
 python -c "import mindspeed; from mindspeed.op_builder import GroupMatmulAddOpBuilder; GroupMatmulAddOpBuilder().load()"
 # =============================================================================
 
-CKPT_SAVE_DIR="/job/data/output/ckpt"
+
 MG_SAVE_DIR="$CKPT_SAVE_DIR/mcore"
 HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 
 # 数据路径配置, 模型路径配置
-DATA_PATH="/job/data/datasets/tatsu-lab/alpaca/data/train-00000-of-00001-a09b74b3ef9c3b56.parquet"
-TOKENIZER_PATH="/job/data/models/moonshotai/Kimi-K2-Base"
-CKPT_LOAD_DIR="/job/data/models/Qwen/Qwen3-0.6B"
-
-DATA_PREFIX_FILE="/job/data/datasets/data_prefixes.txt"
-DATA_DIR="/job/fdd/datasets/C3_LVM/all_preprocessed_datasets"
-DATA_NAME_PATTERN="part*"
+TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
+CKPT_LOAD_DIR=""
+DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
+DATA_DIR="${DATA_DIR:-/llm_workspace_1P/robin/hfhub/datasets}"
+DATA_NAME_PATTERN="${DATA_NAME_PATTERN:-part*}"
+DATA_CACHE_PATH="$DATA_DIR/cache/megatron_indices"
 # =============================================================================
 
 if [[ "${RANK}" -eq 0 ]]; then                     # 判断是否是rank,如是则设置其pod_ip为TTP_ADDR
@@ -136,9 +126,6 @@ fi
 
 
 # =============================================================================
-
-
-
 # Auto-discover data paths (populate no_ext_files array)
 discover_data_prefixes() {
     local data_dir="$1"
@@ -206,7 +193,6 @@ prepare_data_prefixes() {
 }
 
 
-
 # 自动发现数据集前缀
 if ! prepare_data_prefixes; then
     echo "[ERROR] 数据前缀发现失败，无法继续训练！"
@@ -222,8 +208,8 @@ PP=1
 MBS=4
 GBS=8192
 SEQ_LENGTH=4096
-TRAIN_ITERS=2000
-SAVE_ITERS=1000
+TRAIN_ITERS=60000
+SAVE_ITERS=10
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
@@ -318,8 +304,7 @@ TRAIN_FROM_HF="
 
 TRAIN_FROM_MG="
     --data-path $DATA_PREFIXES \
-    --num-dataset-builder-threads 4 \
-    --data-cache-path $CKPT_SAVE_DIR/cache/megatron_indices \
+    --data-cache-path $DATA_CACHE_PATH \
     --split 100,0,0 \
     --save $CKPT_SAVE_DIR \
     --manual-gc \
