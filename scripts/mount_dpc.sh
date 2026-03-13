@@ -21,6 +21,7 @@ REMOTE_UMOUNT_PATHS="${REMOTE_UMOUNT_PATHS:-/mnt/9w1N7vBPmO3wMAYjqZL /mnt/yWXKUI
 SSH_USER="${SSH_USER:-}"
 SSH_PORT="${SSH_PORT:-}"
 SSH_IDENTITY_FILE="${SSH_IDENTITY_FILE:-}"
+SSH_MUX="${SSH_MUX:-1}"
 
 # Help message
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -32,6 +33,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "     SSH_USER (default: current user)"
     echo "     SSH_PORT (default: ssh default)"
     echo "     SSH_IDENTITY_FILE (default: ssh default)"
+    echo "     SSH_MUX (default: 1)"
     exit 0
 fi
 
@@ -82,6 +84,9 @@ run_host() {
         -o UserKnownHostsFile=/dev/null
         -o LogLevel=ERROR
     )
+    if [[ "$SSH_MUX" != "0" ]]; then
+        ssh_opts+=(-o ControlMaster=auto -o ControlPersist=60s -o "ControlPath=/tmp/k8scluster-ssh-%r@%h:%p")
+    fi
     if [[ -n "$SSH_PORT" ]]; then
         ssh_opts+=(-p "$SSH_PORT")
     fi
@@ -101,24 +106,20 @@ run_host() {
 
     # 2. Create directory and Mount
     # Check mkdir success before mounting
-    cmd_mount="mkdir -p \"$REMOTE_MOUNTPOINT\" && "
-    cmd_mount+="echo \"[INFO] Mounting $REMOTE_MOUNTPOINT\" && "
-    cmd_mount+="mount -t dtfs \"$REMOTE_MOUNTPOINT\" \"$REMOTE_MOUNTPOINT\""
+    cmd_mount="mkdir -p \"$REMOTE_MOUNTPOINT\" && mount -t dtfs \"$REMOTE_MOUNTPOINT\" \"$REMOTE_MOUNTPOINT\" && mount | grep -q \" $REMOTE_MOUNTPOINT \""
+
+    if [[ -n "$cmd_umount" ]]; then
+        local output
+        if output=$(ssh "${ssh_opts[@]}" "$target" "$cmd_umount" 2>&1); then
+            echo "$output" | sed "s/^/[$ip] /"
+        else
+            echo "$output" | sed "s/^/[$ip] [WARN] /"
+        fi
+    fi
 
     while [[ "$attempt" -le "$RETRIES" ]]; do
         local output
 
-        # Execute Unmount (if needed)
-        if [[ -n "$cmd_umount" ]]; then
-            if output=$(ssh "${ssh_opts[@]}" "$target" "$cmd_umount" 2>&1); then
-                echo "$output" | sed "s/^/[$ip] /"
-            else
-                # Unmount failure is usually ignored (or handled by || true inside), but if ssh fails we might want to log
-                echo "$output" | sed "s/^/[$ip] [WARN] /"
-            fi
-        fi
-
-        # Execute Mount
         if output=$(ssh "${ssh_opts[@]}" "$target" "$cmd_mount" 2>&1); then
             echo "$output" | sed "s/^/[$ip] /"
             echo "OK $ip"
@@ -127,7 +128,6 @@ run_host() {
 
         echo "$output" | sed "s/^/[$ip] [FAIL] /"
 
-        # Simple backoff
         sleep "$attempt"
         attempt=$((attempt + 1))
     done
@@ -136,67 +136,8 @@ run_host() {
     return 1
 }
 
-# Function to verify mount status
-check_mount() {
-    local ip="$1"
-    local target="${SSH_USER:+${SSH_USER}@}${ip}"
-    local ssh_opts=(
-        -o BatchMode=yes
-        -o ConnectTimeout=10
-        -o ServerAliveInterval=10
-        -o ServerAliveCountMax=3
-        -o StrictHostKeyChecking=no
-        -o UserKnownHostsFile=/dev/null
-        -o LogLevel=ERROR
-    )
-    if [[ -n "$SSH_PORT" ]]; then
-        ssh_opts+=(-p "$SSH_PORT")
-    fi
-    if [[ -n "$SSH_IDENTITY_FILE" ]]; then
-        ssh_opts+=(-i "$SSH_IDENTITY_FILE")
-    fi
-
-    # Check if mountpoint exists in /proc/mounts or mount command output
-    if ssh "${ssh_opts[@]}" "$target" "mount | grep -q \" $REMOTE_MOUNTPOINT \"" >/dev/null 2>&1; then
-        echo "MOUNT_OK $ip"
-        return 0
-    else
-        echo "MOUNT_FAIL $ip"
-        return 1
-    fi
-}
-
-export -f run_host check_mount
-export REMOTE_MOUNTPOINT REMOTE_UMOUNT_PATHS RETRIES
-
-# Function to check SSH connectivity
-check_ssh() {
-    local ip="$1"
-    local target="${SSH_USER:+${SSH_USER}@}${ip}"
-    local ssh_opts=(
-        -o BatchMode=yes
-        -o ConnectTimeout=5
-        -o ServerAliveInterval=5
-        -o ServerAliveCountMax=1
-        -o StrictHostKeyChecking=no
-        -o UserKnownHostsFile=/dev/null
-        -o LogLevel=ERROR
-    )
-    if [[ -n "$SSH_PORT" ]]; then
-        ssh_opts+=(-p "$SSH_PORT")
-    fi
-    if [[ -n "$SSH_IDENTITY_FILE" ]]; then
-        ssh_opts+=(-i "$SSH_IDENTITY_FILE")
-    fi
-    if ssh "${ssh_opts[@]}" "$target" "exit 0" >/dev/null 2>&1; then
-        echo "SSH_OK $ip"
-        return 0
-    else
-        echo "SSH_FAIL $ip"
-        return 1
-    fi
-}
-export -f check_ssh
+export -f run_host
+export REMOTE_MOUNTPOINT REMOTE_UMOUNT_PATHS RETRIES SSH_USER SSH_PORT SSH_IDENTITY_FILE SSH_MUX
 
 # Read IPs (ignoring comments and empty lines)
 # Compatible with bash 3.2+ (macOS default) by using array assignment
@@ -210,68 +151,29 @@ if [[ "${#ALL_IPS[@]}" -eq 0 ]]; then
     exit 1
 fi
 
-echo "[INFO] Checking SSH connectivity for ${#ALL_IPS[@]} hosts..."
-
-# Check SSH in parallel
-exec 3>&1
-SSH_CHECK_OUTPUT="$(
-    printf '%s\n' "${ALL_IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'check_ssh "$1"' _ | tee /dev/fd/3
-)"
-
-# Filter reachable IPs
-IPS=($(echo "$SSH_CHECK_OUTPUT" | grep '^SSH_OK' | awk '{print $2}'))
-SSH_FAIL_COUNT=$(echo "$SSH_CHECK_OUTPUT" | grep -c '^SSH_FAIL' || true)
-
-if [[ "$SSH_FAIL_COUNT" -gt 0 ]]; then
-    echo ""
-    echo "[WARN] $SSH_FAIL_COUNT hosts are unreachable via SSH and will be skipped."
-fi
-
-if [[ "${#IPS[@]}" -eq 0 ]]; then
-    echo "[ERROR] No hosts are reachable via SSH. Exiting." >&2
-    exit 1
-fi
-
 echo ""
-echo "[INFO] Mounting on ${#IPS[@]} hosts..."
+echo "[INFO] Mounting on ${#ALL_IPS[@]} hosts..."
 
-# Execute mount in parallel
-exec 3>&1
-MOUNT_OUTPUT="$(
-    printf '%s\n' "${IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'run_host "$1"' _ | tee /dev/fd/3
-)"
+SUCCESS_COUNT=0
+FAIL_COUNT=0
+FAILED_IPS=()
 
-# Count results
-SUCCESS_COUNT=$(echo "$MOUNT_OUTPUT" | grep -c '^OK ' || true)
-FAIL_COUNT=$(echo "$MOUNT_OUTPUT" | grep -c '^FAIL ' || true)
+while IFS= read -r line; do
+    printf '%s\n' "$line"
+    if [[ "$line" == OK\ * ]]; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    elif [[ "$line" == FAIL\ * ]]; then
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_IPS+=("${line#FAIL }")
+    fi
+done < <(printf '%s\n' "${ALL_IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'run_host "$1"' _)
 
 echo ""
 echo "[INFO] Mount Summary: SUCCESS=$SUCCESS_COUNT, FAIL=$FAIL_COUNT"
 
 if [[ "$FAIL_COUNT" -ne 0 ]]; then
     echo "[ERROR] Failed hosts:" >&2
-    echo "$MOUNT_OUTPUT" | grep '^FAIL ' | awk '{print $2}' >&2
-    exit 2
-fi
-
-echo ""
-echo "[INFO] Verifying mount status on ${#IPS[@]} hosts..."
-
-# Check mount status in parallel
-exec 3>&1
-MOUNT_CHECK_OUTPUT="$(
-    printf '%s\n' "${IPS[@]}" | xargs -n 1 -P "$PARALLEL" bash -c 'check_mount "$1"' _ | tee /dev/fd/3
-)"
-
-MOUNT_OK_COUNT=$(echo "$MOUNT_CHECK_OUTPUT" | grep -c '^MOUNT_OK' || true)
-MOUNT_FAIL_COUNT=$(echo "$MOUNT_CHECK_OUTPUT" | grep -c '^MOUNT_FAIL' || true)
-
-echo ""
-echo "[INFO] Verification Summary: OK=$MOUNT_OK_COUNT, FAIL=$MOUNT_FAIL_COUNT"
-
-if [[ "$MOUNT_FAIL_COUNT" -ne 0 ]]; then
-    echo "[ERROR] Hosts with mount failure:" >&2
-    echo "$MOUNT_CHECK_OUTPUT" | grep '^MOUNT_FAIL' | awk '{print $2}' >&2
+    printf '%s\n' "${FAILED_IPS[@]}" >&2
     exit 2
 fi
 
