@@ -111,14 +111,14 @@ else
     device_count=${LOCAL_WORLD_SIZE}
     if [[ "${device_count}" -eq 0 ]]; then
       echo "device count is 0, train job failed." | tee -a hccl.log
-      chmod 440 ${output_url}
+      if [[ -n "${output_url:-}" ]]; then chmod 440 "${output_url}"; fi
       exit 1
     fi
     # 获取环境变量中的server_count字段
     server_count=`expr ${WORLD_SIZE} / ${LOCAL_WORLD_SIZE}`
     if [[ "${server_count}" == "" ]]; then
       echo "server count is 0, train job failed." | tee -a hccl.log
-      chmod 440 ${output_url}
+      if [[ -n "${output_url:-}" ]]; then chmod 440 "${output_url}"; fi
       exit 1
     fi
 fi
@@ -172,6 +172,10 @@ prepare_data_prefixes() {
             return 0
         fi
     fi
+    if [ -z "${DATA_DIR:-}" ] || [ -z "${DATA_NAME_PATTERN:-}" ]; then
+        echo "[ERROR] DATA_PREFIX_FILE 不存在或为空时，需要同时设置 DATA_DIR 与 DATA_NAME_PATTERN"
+        return 1
+    fi
     if ! discover_data_prefixes "$DATA_DIR" "$DATA_NAME_PATTERN" DATA_FILES_LIST; then
         return 1
     fi
@@ -209,7 +213,7 @@ MBS=4
 GBS=8192
 SEQ_LENGTH=4096
 TRAIN_ITERS=60000
-SAVE_ITERS=10
+SAVE_ITERS=100
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
