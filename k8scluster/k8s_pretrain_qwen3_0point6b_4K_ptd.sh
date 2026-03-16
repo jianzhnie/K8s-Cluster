@@ -88,7 +88,7 @@ HF_SAVE_DIR="$CKPT_SAVE_DIR/hf"
 
 # 数据路径配置, 模型路径配置
 TOKENIZER_PATH="/llm_workspace_1P/robin/hfhub/models/moonshotai/Kimi-K2-Base"
-CKPT_LOAD_DIR=""
+CKPT_LOAD_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
 DATA_PREFIX_FILE="/llm_workspace_1P/robin/hfhub/datasets/data_prefixes.txt"
 DATA_DIR="${DATA_DIR:-/llm_workspace_1P/robin/hfhub/datasets}"
 DATA_NAME_PATTERN="${DATA_NAME_PATTERN:-part*}"
@@ -235,6 +235,14 @@ OPTIMIZE_ARGS="
     --overlap-param-gather
 "
 
+MEMORY_ARGS="
+    --recompute-granularity selective
+    --recompute-method uniform \
+    --recompute-num-layers 1 \
+    --recompute-activation-function \
+    --recompute-norm \
+"
+
 MODEL_PARALLEL_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
@@ -285,8 +293,6 @@ GPT_ARGS="
     --exit-on-missing-checkpoint \
     --group-query-attention \
     --num-query-groups 8 \
-    --no-load-optim \
-    --no-load-rng \
     --seed 42 \
     --bf16
 "
@@ -301,6 +307,7 @@ TRAIN_FROM_HF="
     --split 100,0,0 \
     --enable-hf2mg-convert \
     --model-type-hf qwen3 \
+    --load $CKPT_LOAD_DIR \
     --save $CKPT_SAVE_DIR \
     --mg-save-dir $MG_SAVE_DIR \
     --prompt-type qwen3 \
@@ -310,6 +317,7 @@ TRAIN_FROM_MG="
     --data-path $DATA_PREFIXES \
     --data-cache-path $DATA_CACHE_PATH \
     --split 100,0,0 \
+    --load $CKPT_LOAD_DIR \
     --save $CKPT_SAVE_DIR \
     --manual-gc \
     --manual-gc-interval 50 \
