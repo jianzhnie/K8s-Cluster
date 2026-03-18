@@ -20,7 +20,7 @@ START_SCRIPT="/llm_workspace_1P/robin/MindSpeed-LLM/scripts/${SCRIPT_NAME}"
 
 # 日志与Checkpoint目录配置
 LOG_DIR="$OUTPUT_DIR/logs/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/${MINDX_TASK_ID}"
-CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies/"
+CKPT_SAVE_DIR="$OUTPUT_DIR/ckpt/${SCRIPT_PREFIX}_${WORLD_SIZE}_dies_v2/"
 
 # Rank 0 负责创建目录并备份脚本
 if [[ "${RANK}" -eq 0 ]]; then
@@ -210,10 +210,10 @@ fi
 TP=1
 PP=1
 MBS=4
-GBS=8192
+GBS=32768
 SEQ_LENGTH=4096
 TRAIN_ITERS=60000
-SAVE_ITERS=100
+SAVE_ITERS=2000
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $LOCAL_WORLD_SIZE \
@@ -235,14 +235,6 @@ OPTIMIZE_ARGS="
     --overlap-param-gather
 "
 
-MEMORY_ARGS="
-    --recompute-granularity selective
-    --recompute-method uniform \
-    --recompute-num-layers 1 \
-    --recompute-activation-function \
-    --recompute-norm \
-"
-
 MODEL_PARALLEL_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
@@ -251,8 +243,10 @@ MODEL_PARALLEL_ARGS="
 TRAIN_ARGS="
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
-    --lr 1.25e-6 \
-    --min-lr 1.25e-7 \
+    --lr 5e-4 \
+    --min-lr 5e-5 \
+    --lr-decay-style cosine \
+    --lr-warmup-iters 2000 \
     --weight-decay 1e-1 \
     --attention-dropout 0.0 \
     --hidden-dropout 0.0 \
@@ -317,7 +311,6 @@ TRAIN_FROM_MG="
     --data-path $DATA_PREFIXES \
     --data-cache-path $DATA_CACHE_PATH \
     --split 100,0,0 \
-    --load $CKPT_LOAD_DIR \
     --save $CKPT_SAVE_DIR \
     --manual-gc \
     --manual-gc-interval 50 \

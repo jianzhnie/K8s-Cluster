@@ -59,7 +59,7 @@ spec:
                           - robin-qwen3-0point6b-32-nodes
                   topologyKey: kubernetes.io/hostname
           nodeSelector:
-            fdd-label: full-super-node
+            robin-label: super-node
             # ascend/train.nums: "1024"
             host-arch: huawei-arm
             accelerator-type: module-a3-8-super-pod # depend on your device model, 910bx8 is module-910b-8 ,910bx16 is module-910b-16
