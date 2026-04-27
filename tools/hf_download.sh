@@ -20,3 +20,4 @@ hf download Qwen/Qwen3-32B --local-dir ~/hfhub/models/Qwen/Qwen3-32B --exclude "
 # 数据集下载
 # hf download --repo-type dataset openai/gsm8k --local-dir ~/hfhub/datasets/openai/gsm8k
 hf download --repo-type dataset tatsu-lab/alpaca --local-dir ~/hfhub/datasets/tatsu-lab/alpaca
+hf download --repo-type dataset openai/gsm8k --local-dir ~/hfhub/datasets/openai/gsm8k

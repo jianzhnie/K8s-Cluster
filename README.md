@@ -1,39 +1,83 @@
-# K8s Cluster 学习与实践指南
+# Docker & K8s Playbook
 
-本项目包含 Kubernetes 集群学习资料及 Huawei Ascend 910B 训练实践指南。主要包含以下三个核心文档：
+Docker / Kubernetes / Ascend NPU 训练相关的文档、脚本和配置集合。
 
-## 1. Kubernetes 初学者指南
-**文件：** [tutorial/kubernetes_beginner_guide.md](tutorial/kubernetes_beginner_guide.md)
-- 面向零基础初学者。
-- 涵盖 K8s 基础架构、核心概念（Namespace, Pod, Deployment, Service）及入门操作。
-- 适合刚接触 K8s 的开发者快速上手。
+## 目录结构
 
-## 2. K8s 集群常用命令速查手册
-**文件：** [tutorial/K8s集群常用命令.md](tutorial/K8s集群常用命令.md)
-- 汇集日常运维、开发调试及故障处理的高频命令。
-- 包含集群管理、Pod 操作、网络调试及 AscendJob 专用命令。
-- 适合作为日常工作的案头速查工具。
+```
+docker-k8s-playbook/
+├── docs/                    # 文档
+│   ├── tutorials/           #   K8s 学习教程（入门→进阶）
+│   ├── docker-tutorial.md   #   Docker 命令速查
+│   ├── ascend-env-reference.md  # Ascend 环境变量参考
+│   ├── cloudbrain3-ops.md   #   CloudBrain3 运维手册
+│   └── linux-docker-basics.md   # Linux/Docker 基础命令
+│
+├── docker/                  # Docker 工具
+│   ├── dockerfile/          #   Dockerfile 模板
+│   ├── install.sh           #   Docker 安装（离线）
+│   ├── uninstall.sh         #   Docker 卸载
+│   ├── run_container.sh     #   启动容器（支持单卡/多卡/多节点）
+│   ├── build_image.sh       #   构建镜像（vLLM-Ascend）
+│   ├── export_image.sh      #   导出镜像为 tar.gz
+│   ├── load_image.sh        #   从 tar.gz 加载镜像
+│   ├── save_docker_image.sh #   保存指定镜像
+│   ├── ray_cluster.sh       #   Ray 集群管理
+│   └── sync_dist.sh         #   分发文件到远程节点
+│
+├── k8s/                     # K8s 集群管理
+│   ├── configs/             #   K8s Job YAML 配置
+│   │   ├── kimi2/           #     Kimi-K2 各规模配置
+│   │   ├── llama/           #     LLaMA-3.1 各规模配置
+│   │   ├── deepseek/        #     DeepSeek-V3 各规模配置
+│   │   └── qwen/            #     Qwen3 配置
+│   ├── env/                 #   环境配置脚本
+│   │   ├── k8s_common_env.sh    # K8s 训练环境
+│   │   └── ascend_env.sh        # Ascend Docker 环境
+│   ├── node-label.sh        #   批量节点标签
+│   ├── node-taint.sh        #   节点污点管理
+│   ├── node-find-free.sh    #   查找空闲节点
+│   ├── node-extract-ip.py   #   提取节点 IP/机架信息
+│   ├── mount-dpcfs.sh       #   挂载 DTFS 文件系统
+│   └── start-label-nodes.sh #   标签节点快捷脚本
+│
+├── training/                # 模型训练/评估/推理
+│   ├── launch/              #   通用启动器
+│   │   ├── launch_single_node.sh
+│   │   ├── launch_multi_nodes.sh
+│   │   └── set_env.sh
+│   ├── pretrain/            #   预训练脚本（按模型分类）
+│   │   ├── kimi2/
+│   │   ├── deepseek/
+│   │   ├── llama/
+│   │   └── qwen/
+│   ├── evaluate/            #   评估脚本
+│   │   ├── kimi2/
+│   │   └── qwen/
+│   └── generate/            #   推理生成
+│       └── qwen/
+│
+└── tools/                   # 通用工具
+    ├── hf_download.sh       #   HuggingFace 模型下载
+    ├── compare_weights/     #   Safetensors 权重对比
+    ├── checkpoint/kimi2/    #   Kimi-K2 Checkpoint 转换（HF ↔ MCore）
+    ├── get_file_list.py     #   数据集文件列表生成
+    ├── create_symlinks.sh   #   批量创建软链接
+    ├── kill_process.sh      #   交互式进程清理
+    ├── ssh_utils.sh         #   SSH 远程执行工具函数
+    └── ops-reference.sh     #   运维操作参考
+```
 
-## 3. Huawei Ascend 910B PyTorch 训练实践
-**文件：** [tutorial/K8s-Train.md](tutorial/K8s-Train.md)
-- 针对 Ascend 910B 芯片在 K8s 环境下的深度学习训练指南。
-- 详细讲解单机多卡与多机多卡训练配置（AscendJob）。
-- 包含故障自愈（Volcano + MindX DL）及核心参数解析。
+## 快速导航
 
-## 4. K8s YAML 配置详解
-**文件：** [tutorial/K8s-YAML配置详解.md](tutorial/K8s-YAML配置详解.md)
-- 详细解释 K8s 中常用的 YAML 配置文件。
-- 包括 Deployment, Service, Volume, ConfigMap, Secret 等核心组件的配置。
-- 适合进阶开发者或系统管理员学习 K8s 配置。
-
-## 5. K8s 集群扩容与维护
-**文件：** [tutorial/K8s集群扩容.md](tutorial/K8s集群扩容.md)
-- 详细讲解 K8s 集群节点扩容操作。
-- 包括添加新节点、配置网络路由、挂载目录等步骤。
-- 适合系统管理员或运维人员进行集群维护。
-
-
-## 其他帮助文档
-**文件：** [helper.md](helper.md)
-- 包含 rsync 等常用工具的使用说明。
-- 适合需要频繁操作文件传输的开发者。
+| 场景 | 去哪里 |
+|------|--------|
+| 学习 K8s 基础 | [docs/tutorials/k8s-beginner-guide.md](docs/tutorials/k8s-beginner-guide.md) |
+| K8s 命令速查 | [docs/tutorials/k8s-commands-cheatsheet.md](docs/tutorials/k8s-commands-cheatsheet.md) |
+| Ascend 训练指南 | [docs/tutorials/k8s-training-on-ascend.md](docs/tutorials/k8s-training-on-ascend.md) |
+| 构建部署 Docker 镜像 | [docker/](docker/) |
+| 提交 K8s 训练任务 | [k8s/configs/](k8s/configs/) |
+| 查找/管理集群节点 | [k8s/](k8s/) |
+| 运行模型训练 | [training/](training/) |
+| 转换模型权重 | [tools/checkpoint/](tools/checkpoint/kimi2/) |
+| 下载 HuggingFace 模型 | [tools/hf_download.sh](tools/hf_download.sh) |
