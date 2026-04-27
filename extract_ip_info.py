@@ -35,6 +35,7 @@ def read_csv_data(file_path):
     data = {}
     with open(file_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
+        next(reader)  # 跳过表头行
 
         for row in reader:
             if len(row) >= 7:
