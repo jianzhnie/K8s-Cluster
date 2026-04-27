@@ -1,0 +1,79 @@
+# vLLM-Ascend Docker Image for Ascend 910C
+# Base: openEuler 22.03 LTS
+#
+# Pure vllm runtime environment.
+# NPUSlim is mounted + pip install -e at container startup (see entrypoint.sh).
+
+# Proxy args (passed from build_image.sh)
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+
+FROM openeuler/openeuler:22.03-lts-sp4
+
+LABEL maintainer="npuslim"
+LABEL description="vLLM with Ascend NPU support"
+LABEL version="cann8.5.1-torch2.9.0-vllm0.18.0"
+
+# Proxy for build
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+ENV http_proxy=${http_proxy}
+ENV https_proxy=${https_proxy}
+ENV no_proxy=${no_proxy}
+
+# System dependencies
+RUN yum install -y \
+    git curl wget vim procps-ng gcc gcc-c++ make \
+    && yum clean all
+
+# Clear proxy after build
+ENV http_proxy=
+ENV https_proxy=
+
+WORKDIR /workspace
+
+# ============ CANN Installation ============
+COPY ascend/cann-8.5.1 /usr/local/Ascend/cann-8.5.1
+COPY ascend/cann /usr/local/Ascend/cann
+COPY ascend/nnal /usr/local/Ascend/nnal
+
+# Fix hardcoded host paths in CANN/NNAL config files
+RUN find /usr/local/Ascend -type f \( -name '*.sh' -o -name '*.conf' -o -name '*.info' -o -name '*.json' \) \
+    -exec grep -l '/home/lichc/Ascend' {} \; \
+    -exec sed -i 's|/home/lichc/Ascend|/usr/local/Ascend|g' {} +
+
+# CANN environment variables
+ENV CANN_HOME=/usr/local/Ascend/cann-8.5.1
+ENV ASCEND_HOME_PATH=/usr/local/Ascend/cann-8.5.1
+ENV ASCEND_AICPU_PATH=/usr/local/Ascend/cann-8.5.1
+ENV ASCEND_OPP_BUILT_IN=/usr/local/Ascend/cann-8.5.1/opp/built-in/op_impl/ai_core/tbe
+ENV TBE_IMPL_PATH=/usr/local/Ascend/cann-8.5.1/opp/built-in/op_impl/ai_core/tbe
+ENV PATH=/usr/local/Ascend/cann-8.5.1/bin:/usr/local/Ascend/cann-8.5.1/compiler/ccec_compiler/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/Ascend/cann-8.5.1/lib64:/usr/local/Ascend/nnal/atb/8.5.1/atb/cxx_abi_1/lib:${LD_LIBRARY_PATH}
+ENV PYTHONPATH=/usr/local/Ascend/cann-8.5.1/python/site-packages:${PYTHONPATH}
+
+# ATB environment
+ENV ATB_HOME_PATH=/usr/local/Ascend/nnal/atb/8.5.1/atb/cxx_abi_1
+
+# ============ Conda Environment ============
+COPY conda/conda_env.tar.gz /tmp/
+RUN mkdir -p /opt/conda/env && \
+    tar -xzf /tmp/conda_env.tar.gz -C /opt/conda/env && \
+    rm /tmp/conda_env.tar.gz && \
+    /opt/conda/env/bin/python /opt/conda/env/bin/conda-unpack && \
+    chown -R root:root /opt/conda/env
+
+ENV CONDA_DEFAULT_ENV=vllm
+ENV PATH=/opt/conda/env/bin:${PATH}
+ENV CONDA_PREFIX=/opt/conda/env
+ENV VIRTUAL_ENV=/opt/conda/env
+
+# ============ Entrypoint ============
+COPY ascend_env.sh /etc/profile.d/ascend.sh
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash", "-l"]
