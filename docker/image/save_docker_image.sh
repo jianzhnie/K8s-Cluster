@@ -1,22 +1,39 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # 镜像名称和标签
 IMAGE_REPO="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm"
 IMAGE_TAG="openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
-FULL_IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
+IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
 
-# 输出文件名
-OUTPUT_FILE="mindspeed-llm-2.3.0-a3-arm.tar"
+# 输出文件名 (compressed)
+OUTPUT_FILE="mindspeed-llm-2.3.0-a3-arm.tar.gz"
 
-echo "正在保存镜像: ${FULL_IMAGE_NAME}"
-echo "保存路径: $(pwd)/${OUTPUT_FILE}"
-echo "这可能需要几分钟时间（镜像大小约 15.8GB）..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_PATH="${SCRIPT_DIR}/${OUTPUT_FILE}"
 
-if docker save -o "${OUTPUT_FILE}" "${FULL_IMAGE_NAME}"; then
-    echo "✅ 镜像保存成功！"
-    ls -lh "${OUTPUT_FILE}"
+# Check Docker availability
+if ! docker info >/dev/null 2>&1; then
+    echo "ERROR: Docker is not running or not accessible"
+    exit 1
+fi
+
+# Check if image exists
+if ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
+    echo "ERROR: Image not found: ${IMAGE_NAME}"
+    exit 1
+fi
+
+echo "Saving image: ${IMAGE_NAME}"
+echo "Output path:  ${OUTPUT_PATH}"
+echo "This may take several minutes..."
+echo ""
+
+if docker save "${IMAGE_NAME}" | gzip > "${OUTPUT_PATH}"; then
+    echo "Image saved successfully!"
+    ls -lh "${OUTPUT_PATH}"
 else
-    echo "❌ 镜像保存失败。请检查 Docker 是否正在运行。"
+    echo "ERROR: Failed to save image."
+    rm -f "${OUTPUT_PATH}"
     exit 1
 fi

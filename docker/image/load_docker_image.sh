@@ -1,20 +1,16 @@
 #!/bin/bash
 # Load (or reload) Docker image from tarball
-# Usage: bash load_image.sh [--tarball <path>]
-#   Default tarball: the only .tar.gz in this directory matching the image name
+# Usage: bash load_docker_image.sh [--tarball <path>]
+#   Default tarball: the only .tar.gz in this directory
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Version info (keep in sync with run_container.sh)
-CANN_VER="8.5.1"
-TORCH_VER="2.9.0"
-VLLM_VER="0.18.0"
-CHIP_NAME="910c"
-
-IMAGE_NAME="ascend${CHIP_NAME}-cann${CANN_VER}-torch${TORCH_VER}-vllm${VLLM_VER}"
-IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+# 镜像名称和标签
+IMAGE_REPO="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm"
+IMAGE_TAG="openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
+IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
 
 TARBALL=""
 
@@ -22,7 +18,7 @@ TARBALL=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --tarball) TARBALL="$2"; shift 2 ;;
-        *) shift ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
@@ -33,7 +29,13 @@ fi
 
 if [ -z "$TARBALL" ] || [ ! -f "$TARBALL" ]; then
     echo "ERROR: No .tar.gz found in ${SCRIPT_DIR}"
-    echo "Usage: bash load_image.sh [--tarball <path>]"
+    echo "Usage: bash load_docker_image.sh [--tarball <path>]"
+    exit 1
+fi
+
+# Check Docker availability
+if ! docker info >/dev/null 2>&1; then
+    echo "ERROR: Docker is not running or not accessible"
     exit 1
 fi
 
@@ -44,16 +46,20 @@ echo "Image:   ${IMAGE_NAME}"
 echo "Tarball: ${TARBALL}"
 echo ""
 
-# Remove old image if exists
+# Load image first, then remove the old one to avoid data loss on failure
 OLD_ID=$(docker image inspect "${IMAGE_NAME}" --format '{{.Id}}' 2>/dev/null || true)
-if [ -n "$OLD_ID" ]; then
-    echo "Removing old image ${IMAGE_NAME}..."
-    docker rmi "${IMAGE_NAME}" >/dev/null
-    echo ""
-fi
 
 echo "Loading image (this may take a while)..."
 docker load -i "${TARBALL}"
+
+# Remove old image if it was replaced (different ID)
+if [ -n "$OLD_ID" ]; then
+    NEW_ID=$(docker image inspect "${IMAGE_NAME}" --format '{{.Id}}' 2>/dev/null || true)
+    if [ -n "$NEW_ID" ] && [ "$OLD_ID" != "$NEW_ID" ]; then
+        echo "Cleaning up old image (${OLD_ID:0:12})..."
+        docker image prune -f --filter "label!=keep" >/dev/null 2>&1 || true
+    fi
+fi
 
 echo ""
 echo "========================================"
