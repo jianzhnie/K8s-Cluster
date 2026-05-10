@@ -98,8 +98,8 @@ spec:
               args:
                 - |
                   cd /llm_workspace_1P/robin/MindSpeed-LLM;
-                  chmod +x scripts/k8s_evaluate_kimi2_pcl_1t_ptd.sh;
-                  bash scripts/k8s_evaluate_kimi2_pcl_1t_ptd.sh
+                  chmod +x scripts/kimi2/evaluate_pcl_kimi2_1t_ptd.sh;
+                  bash scripts/kimi2/evaluate_pcl_kimi2_1t_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -206,8 +206,8 @@ spec:
               args:
                 - |
                   cd /llm_workspace_1P/robin/MindSpeed-LLM;
-                  chmod +x scripts/k8s_evaluate_kimi2_pcl_1t_ptd.sh;
-                  bash scripts/k8s_evaluate_kimi2_pcl_1t_ptd.sh
+                  chmod +x scripts/kimi2/evaluate_pcl_kimi2_1t_ptd.sh;
+                  bash scripts/kimi2/evaluate_pcl_kimi2_1t_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify

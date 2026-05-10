@@ -95,9 +95,9 @@ spec:
                 - -c
               args:
                 - |
-                  cd /job/code;
-                  chmod +x scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh
+                  cd /llm_workspace_1P/robin/MindSpeed-LLM;
+                  chmod +x scripts/llama/pretrain_llama31_405b_4k_A3_ptd.sh;
+                  bash scripts/llama/pretrain_llama31_405b_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -111,10 +111,8 @@ spec:
                 requests:
                   huawei.com/Ascend910: 8
               volumeMounts:
-                - name: code
-                  mountPath: /job/code
-                - name: data
-                  mountPath: /job/data
+                - name: workspace
+                  mountPath: /llm_workspace_1P
                 - name: ascend-driver
                   mountPath: /usr/local/Ascend/driver
                 - name: dshm
@@ -130,12 +128,9 @@ spec:
             - name: reset-config
               hostPath:
                 path: /user/restore/reset/default.reset-config-robin-llama31-405b-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
-            - name: code
+            - name: workspace
               hostPath:
-                path: /llm_workspace_1P/robin/MindSpeed-LLM
-            - name: data
-              hostPath:
-                path: /llm_workspace_1P/robin/hfhub/
+                path: /llm_workspace_1P
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
@@ -206,9 +201,9 @@ spec:
                 - -c
               args:
                 - |
-                  cd /job/code;
-                  chmod +x scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh;
-                  bash scripts/k8s_pretrain_llama31_405b_4k_A3_ptd.sh
+                  cd /llm_workspace_1P/robin/MindSpeed-LLM;
+                  chmod +x scripts/llama/pretrain_llama31_405b_4k_A3_ptd.sh;
+                  bash scripts/llama/pretrain_llama31_405b_4k_A3_ptd.sh
               ports: # default value containerPort: 2222 name: ascendjob-port if not set
                 - containerPort: 2222 # determined by user
                   name: ascendjob-port # do not modify
@@ -222,10 +217,8 @@ spec:
                 requests:
                   huawei.com/Ascend910: 8
               volumeMounts:
-                - name: code
-                  mountPath: /job/code
-                - name: data
-                  mountPath: /job/data
+                - name: workspace
+                  mountPath: /llm_workspace_1P
                 - name: ascend-driver
                   mountPath: /usr/local/Ascend/driver
                 - name: dshm
@@ -241,12 +234,9 @@ spec:
             - name: reset-config
               hostPath:
                 path: /user/restore/reset/default.reset-config-robin-llama31-405b-128-nodes # Correspond to the /user/restore/reset/namespace.configmap-name above.
-            - name: code
+            - name: workspace
               hostPath:
-                path: /llm_workspace_1P/robin/MindSpeed-LLM
-            - name: data
-              hostPath:
-                path: /llm_workspace_1P/robin/hfhub/
+                path: /llm_workspace_1P
             - name: ascend-driver
               hostPath:
                 path: /usr/local/Ascend/driver
