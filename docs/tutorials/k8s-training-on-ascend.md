@@ -201,7 +201,7 @@ resources:
 *   **两者配合**：打通了 **物理机路径 (`/llm_workspace_1P`)** <--> **容器内路径 (`/llm_workspace_1P`)** 的通道，让容器能直接读写物理机上的文件。
 *
 ### 3. 挂载其他必要卷
-*   `/job/code`, `/job/data`: 挂载代码和数据集。
+*   `/llm_workspace_1P`: 挂载工作空间（代码和数据集统一挂载）。
 *   `/usr/local/Ascend/driver`: **必须**。挂载宿主机的 NPU 驱动。
 *   `/dev/shm`: **必须**。共享内存，PyTorch 多进程通信依赖。
 *   `/etc/localtime`: 挂载宿主机时间配置，保证时间同步。
@@ -289,9 +289,9 @@ spec:
 *   **示例配置**:
     ```yaml
     volumes:
-      - name: code
+      - name: workspace
         hostPath:
-          path: /llm_workspace_1P/train/MindSpeed-LLM # 确保所有节点该路径存在且内容一致
+          path: /llm_workspace_1P # 确保所有节点该路径存在且内容一致
     ```
 
 

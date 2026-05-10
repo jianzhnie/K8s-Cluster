@@ -11,7 +11,6 @@
   - [代理设置与取消](#代理设置与取消)
     - [设置代理（全局生效：/etc/profile）](#设置代理全局生效etcprofile)
     - [取消代理](#取消代理)
-  - [添加路由](#添加路由)
 
 
 ## 目录权限调整
@@ -69,16 +68,3 @@ unset no_proxy
 
 - 再次编辑 `/etc/profile`，删除或注释掉上面的 `export ...` 行
 - 重新登录，或执行 `source /etc/profile` 使其生效
-
-## 添加路由
-
-```bash
-sudo route add -host 10.42.201.1 10.42.15.1
-sudo route add -host 10.42.201.2 10.42.15.1
-sudo route add -host 10.42.201.242 10.42.15.1
-sudo route add -host 10.42.29.133 10.42.15.1
-sudo route add -host 10.42.29.130 10.42.15.1
-sudo route add -host 10.42.24.130 10.42.15.1
-sudo route add -host 10.42.22.130 10.42.15.1
-```
-

@@ -194,7 +194,7 @@ env:
 | :--- | :--- | :--- |
 | `/usr/local/Ascend/driver` | `/usr/local/Ascend/driver` | **NPU 驱动** (必须)。 |
 | `/dev/shm` | `/dev/shm` | **共享内存** (PyTorch DDP 依赖)。 |
-| `/data/workspace` | `/workspace` | 代码与数据集。 |
+| `/llm_workspace_1P` | `/llm_workspace_1P` | 代码与数据集（统一工作空间）。 |
 
 ---
 

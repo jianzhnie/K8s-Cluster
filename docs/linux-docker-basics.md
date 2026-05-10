@@ -172,24 +172,3 @@ rsync -av --delete --dry-run /src/ /dest/
 
 这会模拟运行一次，告诉你**“如果真动手，我会删哪些、传哪些”**，确认无误后再去掉 `-n` 正式执行。
 
-
-##  Docker 容器操作
-要进入正在运行的容器，推荐使用 `docker exec` 命令开启一个新的终端会话。
-
-你可以使用容器 ID (`5944cdcd0d5c`) 或容器名称 (`mindspeed-llm-env`) 来进入。
-
-### 方法 1：使用容器名称（推荐）
-```bash
-docker exec -it mindspeed-llm-env /bin/bash
-```
-
-### 方法 2：使用容器 ID
-```bash
-docker exec -it 5944cdcd0d5c /bin/bash
-```
-
-**参数说明：**
-*   `-i`: 保持 STDIN 打开（即使没有连接）。
-*   `-t`: 分配一个伪终端 (pseudo-TTY)。
-*   `/bin/bash`: 指定在容器内执行的 Shell（如果没有 bash，也可以尝试 `/bin/sh`）。
-

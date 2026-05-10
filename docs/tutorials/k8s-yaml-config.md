@@ -562,7 +562,7 @@ resources:
 ```
 
 **5. 存储挂载 (Volumes)**
-*   `/job/code`, `/job/data`: 挂载代码和数据集。
+*   `/llm_workspace_1P`: 挂载工作空间（代码和数据集统一挂载）。
 *   `/usr/local/Ascend/driver`: **必须**。挂载宿主机的 NPU 驱动。
 *   `/dev/shm`: **必须**。共享内存，PyTorch 多进程通信依赖。
 *   `/etc/localtime`: 挂载宿主机时间配置，保证时间同步。
