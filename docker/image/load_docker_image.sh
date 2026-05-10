@@ -24,7 +24,11 @@ done
 
 # Auto-detect tarball
 if [ -z "$TARBALL" ]; then
-    TARBALL=$(find "$SCRIPT_DIR" -maxdepth 1 -name '*.tar.gz' | head -1)
+    TARBALLS=( "$SCRIPT_DIR"/*.tar.gz )
+    if [ ${#TARBALLS[@]} -gt 1 ]; then
+        echo "WARNING: Multiple .tar.gz files found, using: ${TARBALLS[0]}"
+    fi
+    TARBALL="${TARBALLS[0]}"
 fi
 
 if [ -z "$TARBALL" ] || [ ! -f "$TARBALL" ]; then
@@ -57,7 +61,7 @@ if [ -n "$OLD_ID" ]; then
     NEW_ID=$(docker image inspect "${IMAGE_NAME}" --format '{{.Id}}' 2>/dev/null || true)
     if [ -n "$NEW_ID" ] && [ "$OLD_ID" != "$NEW_ID" ]; then
         echo "Cleaning up old image (${OLD_ID:0:12})..."
-        docker image prune -f --filter "label!=keep" >/dev/null 2>&1 || true
+        docker rmi "${OLD_ID}" >/dev/null 2>&1 || true
     fi
 fi
 
