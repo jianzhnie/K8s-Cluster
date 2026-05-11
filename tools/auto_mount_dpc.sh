@@ -19,17 +19,17 @@ EOF
     exit 1
 }
 
-SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=no"
+SSH_OPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=no)
 MOUNT_TYPE="dtfs"
 user="root"
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -file)   NODE_LIST_FILE="$2"; shift 2 ;;
-        -source) SOURCE="$2"; shift 2 ;;
-        -target) TARGET="$2"; shift 2 ;;
-        -mount)  MOUNT_TYPE="$2"; shift 2 ;;
-        -user)   user="$2"; shift 2 ;;
+        -file)   [ -n "$2" ] && [[ "$2" != -* ]] && NODE_LIST_FILE="$2" || { echo "Error: $1 requires an argument" >&2; usage; }; shift 2 ;;
+        -source) [ -n "$2" ] && [[ "$2" != -* ]] && SOURCE="$2" || { echo "Error: $1 requires an argument" >&2; usage; }; shift 2 ;;
+        -target) [ -n "$2" ] && [[ "$2" != -* ]] && TARGET="$2" || { echo "Error: $1 requires an argument" >&2; usage; }; shift 2 ;;
+        -mount)  [ -n "$2" ] && [[ "$2" != -* ]] && MOUNT_TYPE="$2" || { echo "Error: $1 requires an argument" >&2; usage; }; shift 2 ;;
+        -user)   [ -n "$2" ] && [[ "$2" != -* ]] && user="$2" || { echo "Error: $1 requires an argument" >&2; usage; }; shift 2 ;;
         -h|-help) usage ;;
         *) echo "Error: Unknown option $1" >&2; usage ;;
     esac
@@ -53,7 +53,7 @@ mount_on_node() {
     local node="$1"
     echo "Processing node: $node"
 
-    ssh $SSH_OPTS "${user}@${node}" "
+    ssh "${SSH_OPTS[@]}" "${user}@${node}" "
         TARGET='$TARGET'; SOURCE='$SOURCE'; MT='$MOUNT_TYPE'
 
         if mountpoint -q \"\$TARGET\"; then
@@ -70,29 +70,27 @@ mount_on_node() {
             exit 1
         fi
 
-        if mountpoint -q \"\$TARGET\"; then
-            echo \"  Mounted \$SOURCE -> \$TARGET (type: \$MT)\"
-        else
-            echo \"  Failed to mount on $node (type: \$MT)\" >&2
-            exit 1
-        fi
+        echo \"  Mounted \$SOURCE -> \$TARGET (type: \$MT)\"
     "
 }
 
 fail=0
+total=${#NODE_HOSTS[@]}
+
 for node in "${NODE_HOSTS[@]}"; do
     mount_on_node "$node" &
 done
 
 for pid in $(jobs -p); do
     if ! wait "$pid"; then
-        fail=1
+        ((fail++))
     fi
 done
 
+echo "----------------------------------------"
 if [ "$fail" -eq 0 ]; then
-    echo "All mount operations completed successfully."
+    echo "All $total mount operations completed successfully."
 else
-    echo "Some mount operations failed." >&2
+    echo "$fail/$total mount operations failed." >&2
     exit 1
 fi
