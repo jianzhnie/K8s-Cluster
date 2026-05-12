@@ -70,13 +70,40 @@ is_local() {
     return 1
 }
 
+# Check if Docker is already installed on a node
+docker_already_installed() {
+    local host=$1
+    if is_local "$host"; then
+        docker --version &>/dev/null && return 0
+    else
+        ssh -o ConnectTimeout="$SSH_TIMEOUT" -o BatchMode=yes \
+            "${SSH_USER}@${host}" "docker --version" &>/dev/null && return 0
+    fi
+    return 1
+}
+
 # Install Docker on a single node
 install_on_node() {
     local host=$1
     local log_file="${PARALLEL_LOG_DIR}/${host}.log"
 
     {
-        echo "[$(date '+%H:%M:%S')] === Starting Docker install on ${host} ==="
+        echo "[$(date '+%H:%M:%S')] === Checking Docker on ${host} ==="
+
+        if docker_already_installed "$host"; then
+            local ver
+            if is_local "$host"; then
+                ver=$(docker --version 2>/dev/null)
+            else
+                ver=$(ssh -o ConnectTimeout="$SSH_TIMEOUT" -o BatchMode=yes \
+                    "${SSH_USER}@${host}" "docker --version" 2>/dev/null)
+            fi
+            echo "[$(date '+%H:%M:%S')] Docker already installed: $ver"
+            echo "SKIPPED"
+            return 0
+        fi
+
+        echo "[$(date '+%H:%M:%S')] Docker not found, starting installation..."
 
         if is_local "$host"; then
             echo "[$(date '+%H:%M:%S')] Local node detected, running directly..."
@@ -133,14 +160,21 @@ echo ""
 # Wait for all background jobs and collect results
 FAILED_HOSTS=()
 SUCCESS_HOSTS=()
+SKIPPED_HOSTS=()
 
 for i in "${!NODES[@]}"; do
     host="${NODES[$i]}"
     pid="${PIDS[$i]}"
 
     if wait "$pid" 2>/dev/null; then
-        SUCCESS_HOSTS+=("$host")
-        echo "  [OK]    ${host}"
+        log_file="${PARALLEL_LOG_DIR}/${host}.log"
+        if grep -q "^SKIPPED$" "$log_file" 2>/dev/null; then
+            SKIPPED_HOSTS+=("$host")
+            echo "  [SKIP]  ${host}  (already installed)"
+        else
+            SUCCESS_HOSTS+=("$host")
+            echo "  [OK]    ${host}"
+        fi
     else
         FAILED_HOSTS+=("$host")
         echo "  [FAIL]  ${host}  -> see ${PARALLEL_LOG_DIR}/${host}.log"
@@ -151,9 +185,13 @@ echo ""
 echo "===================================================="
 echo "  INSTALLATION SUMMARY"
 echo "===================================================="
-echo "Success: ${#SUCCESS_HOSTS[@]}/${#NODES[@]}"
-[[ ${#SUCCESS_HOSTS[@]} -gt 0 ]] && echo "  OK:    ${SUCCESS_HOSTS[*]}"
-[[ ${#FAILED_HOSTS[@]} -gt 0 ]] && echo "  FAIL:  ${FAILED_HOSTS[*]}"
+echo "Total:   ${#NODES[@]}"
+echo "Success: ${#SUCCESS_HOSTS[@]} (fresh install)"
+echo "Skipped: ${#SKIPPED_HOSTS[@]} (already installed)"
+echo "Failed:  ${#FAILED_HOSTS[@]}"
+[[ ${#SUCCESS_HOSTS[@]} -gt 0 ]] && echo "  OK:     ${SUCCESS_HOSTS[*]}"
+[[ ${#SKIPPED_HOSTS[@]} -gt 0 ]]  && echo "  SKIP:   ${SKIPPED_HOSTS[*]}"
+[[ ${#FAILED_HOSTS[@]} -gt 0 ]]   && echo "  FAIL:   ${FAILED_HOSTS[*]}"
 echo "Logs: $PARALLEL_LOG_DIR"
 echo "===================================================="
 
