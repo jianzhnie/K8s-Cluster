@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SCRIPT="${SCRIPT_DIR}/instll_docker_ce.sh"
-NODES_FILE="${1:-${SCRIPT_DIR}/nodes.txt}"
+NODES_FILE="${1:-${SCRIPT_DIR}/ip_list.txt}"
 SSH_USER="${SSH_USER:-root}"
 SSH_TIMEOUT="${SSH_TIMEOUT:-10}"
 PARALLEL_LOG_DIR="/tmp/docker_install_logs_$(date +%Y%m%d_%H%M%S)"

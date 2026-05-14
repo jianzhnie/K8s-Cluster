@@ -6,6 +6,12 @@ REAL_USER="${SUDO_USER:-$(whoami)}"
 ARCH=$(uname -m)
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
+# Define sudo command if not root
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    SUDO="sudo"
+fi
+
 # Configurable ISO path (override via environment)
 ISO_PATH="${DOCKER_ISO_PATH:-/home/jianzhnie/llmtuner/software/archived/HCE-2.0-aarch64-dvd.iso}"
 MOUNT_POINT="/mnt"
@@ -32,11 +38,18 @@ if [[ ! -f "$ISO_PATH" ]]; then
     exit 1
 fi
 
-if mountpoint -q "$MOUNT_POINT"; then
-    echo "[$TIMESTAMP] [INFO] $MOUNT_POINT is already mounted, skipping mount."
+# Check if mount point is already used for the ISO or something else
+if mount | grep -E "on ${MOUNT_POINT}(/| )" | grep -q "type"; then
+    if mount | grep -q "${ISO_PATH} on ${MOUNT_POINT} "; then
+        echo "[$TIMESTAMP] [INFO] ISO is already mounted to $MOUNT_POINT, skipping."
+    else
+        echo "[$TIMESTAMP] [WARN] $MOUNT_POINT is already mounted by something else."
+        echo "[$TIMESTAMP] [INFO] Attempting to use existing mount..."
+    fi
 else
     echo "[$TIMESTAMP] [INFO] Mounting ISO to $MOUNT_POINT..."
-    sudo mount -o loop "$ISO_PATH" "$MOUNT_POINT" || {
+    $SUDO mkdir -p "$MOUNT_POINT"
+    $SUDO mount -o loop "$ISO_PATH" "$MOUNT_POINT" || {
         echo "[$TIMESTAMP] [ERROR] Failed to mount ISO."
         exit 1
     }
@@ -44,9 +57,9 @@ fi
 
 # 2. Backup existing repo files
 echo "[$TIMESTAMP] [INFO] Backing up existing repo configuration..."
-sudo mkdir -p /etc/yum.repos.d/backup
+$SUDO mkdir -p /etc/yum.repos.d/backup
 if compgen -G "/etc/yum.repos.d/*.repo" > /dev/null; then
-    sudo mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup/
+    $SUDO mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup/
     echo "[$TIMESTAMP] [INFO] Moved existing .repo files to backup/."
 else
     echo "[$TIMESTAMP] [INFO] No existing .repo files to back up."
@@ -54,23 +67,21 @@ fi
 
 # 3. Create local repo configuration
 echo "[$TIMESTAMP] [INFO] Creating local repo configuration..."
-sudo tee /etc/yum.repos.d/local.repo > /dev/null <<EOF
-[local]
+echo "[local]
 name=Local HCE 2.0 Repo
 baseurl=file://$MOUNT_POINT
 enabled=1
 gpgcheck=1
-gpgkey=file://$MOUNT_POINT/RPM-GPG-KEY-HCE-2
-EOF
+gpgkey=file://$MOUNT_POINT/RPM-GPG-KEY-HCE-2" | $SUDO tee /etc/yum.repos.d/local.repo > /dev/null
 
 # 4. Rebuild DNF cache
 echo "[$TIMESTAMP] [INFO] Rebuilding DNF cache..."
-sudo dnf clean all
-sudo dnf makecache
+$SUDO dnf clean all
+$SUDO dnf makecache
 
 # 5. Determine the correct Docker package name
 echo "[$TIMESTAMP] [INFO] Searching for available Docker packages..."
-DOCKER_PKG=$(sudo dnf search docker 2>/dev/null | grep -oP '^(docker(-ce|-engine)?|podman)\b' | head -n 1)
+DOCKER_PKG=$($SUDO dnf search docker 2>/dev/null | grep -oP '^(docker(-ce|-engine)?|podman)\b' | head -n 1)
 if [[ -z "$DOCKER_PKG" ]]; then
     echo "[$TIMESTAMP] [ERROR] No Docker package found in the local repo."
     exit 1
@@ -79,7 +90,7 @@ echo "[$TIMESTAMP] [INFO] Found Docker package: $DOCKER_PKG"
 
 # 6. Install Docker
 echo "[$TIMESTAMP] [INFO] Installing $DOCKER_PKG..."
-sudo dnf install -y "$DOCKER_PKG" || {
+$SUDO dnf install -y "$DOCKER_PKG" || {
     echo "[$TIMESTAMP] [ERROR] Docker installation failed."
     exit 1
 }
@@ -87,17 +98,17 @@ sudo dnf install -y "$DOCKER_PKG" || {
 # 7. Configure user group
 echo "[$TIMESTAMP] [INFO] Configuring docker user group..."
 if ! getent group docker > /dev/null; then
-    sudo groupadd docker && echo "[$TIMESTAMP] [INFO] Created group: docker"
+    $SUDO groupadd docker && echo "[$TIMESTAMP] [INFO] Created group: docker"
 else
     echo "[$TIMESTAMP] [INFO] Group 'docker' already exists."
 fi
-sudo gpasswd -a "$REAL_USER" docker || echo "[$TIMESTAMP] [WARN] Could not add $REAL_USER to docker group."
+$SUDO gpasswd -a "$REAL_USER" docker || echo "[$TIMESTAMP] [WARN] Could not add $REAL_USER to docker group."
 
 # 8. Start and enable Docker service
 echo "[$TIMESTAMP] [INFO] Starting and enabling Docker service..."
-sudo systemctl enable --now docker || {
+$SUDO systemctl enable --now docker || {
     echo "[$TIMESTAMP] [ERROR] Docker failed to start."
-    sudo journalctl -u docker --no-pager | tail -n 20
+    $SUDO journalctl -u docker --no-pager | tail -n 20
     exit 1
 }
 
