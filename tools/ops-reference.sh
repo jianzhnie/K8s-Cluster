@@ -73,9 +73,9 @@ kubectl get nodes -l robin-label -o custom-columns=NAME:.metadata.name --no-head
 
 
 # 挂载 DPC
-bash tools/auto_mount_dpc.sh \
-  -file nodes.txt \
+bash /home/jianzhnie/llmtuner/llm/ascend-llm-ops/tools/auto_mount_dpc.sh \
+  -file /home/jianzhnie/llmtuner/llm/tools/ip_list.txt \
   -source /llmtuner \
   -target /home/jianzhnie/llmtuner \
-  -mount dtfs \
+  -mount dpc \
   -user root
