@@ -1,0 +1,159 @@
+# torchtitan-npu Training Environment for Ascend NPU
+# ===================================================
+# Base: quay.io/ascend/vllm-ascend:v0.20.2rc1-a3
+#
+# Base image provides:
+#   - Ubuntu 22.04.5 LTS (ARM aarch64)
+#   - CANN 9.0.0 (Ascend 910_9391)
+#   - Python 3.11.x
+#   - PyTorch 2.10.0 + torch_npu 2.10.0
+#   - triton-ascend 3.2.1
+#   - GCC 11.4.0, git, curl
+#
+# Version matrix:
+#   torchtitan-npu : master (local source)
+#   torchtitan     : ac13e536c84e7f6647b14fa9375c3c8a8a2b8578
+#   torch          : 2.12.0+cpu
+#   torch_npu      : 2.12.0rc1
+#   CANN           : 9.0.0
+#   triton-ascend  : 3.2.1
+#   Python         : 3.11.x
+#
+# Build context: /home/jianzhnie/llmtuner/llm/
+# Build command:
+#   cd /home/jianzhnie/llmtuner/llm
+#   docker build -f ascend-llm-ops/docker/dockerfile/Dockerfile.torchtitan-npu \
+#                -t torchtitan-npu:cann9.0.0-torch2.12.0 .
+
+FROM quay.io/ascend/vllm-ascend:v0.20.2rc1-a3
+
+LABEL maintainer="jianzhnie"
+LABEL description="torchtitan-npu LLM training environment with Ascend NPU support"
+LABEL version="cann9.0.0-torch2.12.0-torchtitan_npu-master"
+
+# ============================================================
+# Global pip mirror — Aliyun PyPI (all subsequent pip calls
+# inherit this config automatically)
+# ============================================================
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ \
+    && pip config set global.trusted-host mirrors.aliyun.com
+
+# ============================================================
+# System Dependencies
+# (unset proxy to avoid 502 on apt)
+# ============================================================
+RUN unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        htop \
+        tmux \
+        unzip \
+        jq \
+        iputils-ping \
+        net-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================================
+# Upgrade PyTorch to 2.12.0 + torch_npu 2.12.0rc1
+# ============================================================
+# numpy / PyYAML must be present before torch_npu import.
+# torch==2.12.0+cpu is installed from pytorch.org (not on PyPI)
+# so we keep the --extra-index-url; Aliyun mirror is still the
+# primary index for everything else.
+RUN pip install --no-cache-dir numpy PyYAML \
+    && pip install --no-cache-dir --force-reinstall \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        torch==2.12.0+cpu \
+    && pip install --no-cache-dir \
+        torch_npu==2.12.0rc1 \
+    && pip cache purge
+
+# ============================================================
+# triton-ascend 3.2.1
+# ============================================================
+RUN pip install --no-cache-dir \
+        --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple \
+        triton-ascend==3.2.1 \
+    && pip cache purge
+
+# ============================================================
+# torchtitan upstream (pinned commit for torch 2.12.0, local source)
+# ============================================================
+# Copied from local clone at torchtitan/ so no network git
+# clone is needed at build time.
+COPY torchtitan /workspace/torchtitan
+
+RUN pip install --no-cache-dir \
+        /workspace/torchtitan \
+    && pip cache purge
+
+# ============================================================
+# Training Ecosystem Dependencies
+# ============================================================
+# Installed before COPY of local source so these layers are
+# cached and not invalidated by source-code changes.
+RUN pip install --no-cache-dir \
+        "datasets>=3.0.0" \
+        "accelerate>=1.0.0" \
+        "wandb>=0.19.0" \
+        "tensorboard>=2.18.0" \
+        "safetensors==0.7.0" \
+        scipy \
+        einops \
+        tiktoken \
+        sentencepiece \
+        pybind11 \
+        ninja \
+    && pip cache purge
+
+# ============================================================
+# torchtitan-npu — install from local source
+# ============================================================
+# COPY is placed after all pip dependency layers so that edits
+# to source code only invalidate the last two steps.
+COPY torchtitan-npu /workspace/torchtitan-npu
+
+RUN pip install --no-cache-dir \
+        -e /workspace/torchtitan-npu \
+        --no-build-isolation \
+    && pip cache purge
+
+# ============================================================
+# Workspace directories
+# ============================================================
+WORKDIR /workspace
+
+# ============================================================
+# Environment Variables
+# ============================================================
+ENV TORCHTITAN_HOME=/workspace/torchtitan-npu
+ENV TORCHTITAN_NPU_BACKEND=hccl
+
+# HCCL communication tuning for distributed training
+ENV HCCL_BUFFSIZE=128
+ENV HCCL_OP_EXPANSION_MODE=AIV
+ENV HCCL_WHITELIST_DISABLE=1
+
+# NPU memory / performance
+ENV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+ENV CPU_AFFINITY_CONF=1
+ENV TASK_QUEUE_ENABLE=2
+ENV HCCL_CONNECT_TIMEOUT=3600
+ENV STREAMS_PER_DEVICE=32
+ENV MULTI_STREAM_MEMORY_RESERVE=1
+
+# Log level (set to 0 for production; override with -e GLOG_v=3 for debugging)
+ENV GLOG_v=0
+
+# ============================================================
+# Verification Script & Entrypoint
+# ============================================================
+COPY ascend-llm-ops/docker/dockerfile/verify_torchtitan.py /workspace/verify_torchtitan.py
+COPY ascend-llm-ops/docker/dockerfile/entrypoint-torchtitan.sh /entrypoint-torchtitan.sh
+RUN chmod +x /workspace/verify_torchtitan.py /entrypoint-torchtitan.sh
+
+# ============================================================
+# Entrypoint
+# ============================================================
+ENTRYPOINT ["/entrypoint-torchtitan.sh"]
+CMD ["/bin/bash", "-l"]

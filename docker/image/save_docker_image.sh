@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # 镜像名称和标签
-IMAGE_REPO="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm"
-IMAGE_TAG="openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
+IMAGE_REPO="quay.io/ascend/vllm-ascend"
+IMAGE_TAG="v0.20.2rc1-a3"
 IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
 
 # 输出文件名 (compressed)
-OUTPUT_FILE="mindspeed-llm-2.3.0-a3-arm.tar.gz"
+OUTPUT_FILE="vllm-ascend.v0.20.2rc1-a3.tar"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_PATH="${SCRIPT_DIR}/${OUTPUT_FILE}"
