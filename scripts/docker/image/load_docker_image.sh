@@ -8,11 +8,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 镜像名称和标签
-IMAGE_REPO="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm"
-IMAGE_TAG="openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
+IMAGE_REPO="swr.cn-south-1.myhuaweicloud.com/ascendhub/mindspeed-llm"
+IMAGE_TAG="26.0.0-a3-openeuler24.03-py3.11-aarch64"
 IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
+TARBALL="/home/jianzhnie/llmtuner/hfhub/docker/image/mindspeed-llm-26.0.0-a3-arm.tar.gz"
 
-TARBALL=""
+# IMAGE_REPO="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm"
+# IMAGE_TAG="openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
+# IMAGE_NAME="${IMAGE_REPO}:${IMAGE_TAG}"
+# TARBALL=""
 
 # Parse args
 while [[ $# -gt 0 ]]; do

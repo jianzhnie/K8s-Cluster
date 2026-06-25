@@ -82,8 +82,4 @@ bash /home/jianzhnie/llmtuner/llm/ascend-llm-ops/tools/auto_mount_dpc.sh \
 
 
 
-mkdir -p /llm_workspace_1P 
-mount -t dtfs /llm_workspace_1P /llm_workspace_1P
 
-mkdir -p /home/jianzhnie/llmtuner
-mount -t dtfs /llmtuner /home/jianzhnie/llmtuner

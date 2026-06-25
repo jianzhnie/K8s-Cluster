@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-IMAGE_NAME="cis-pengcheng.cmecloud.cn/ascendhub/mindspeed-llm:openeuler22.03-mindspeed-llm-2.3.0-a3-arm"
+IMAGE_NAME="swr.cn-south-1.myhuaweicloud.com/ascendhub/mindspeed-llm:26.0.0-a3-openeuler24.03-py3.11-aarch64"
 CONTAINER_NAME="mindspeed-llm-env"
 
 # Check if container exists
@@ -45,5 +45,6 @@ docker run -d \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /root/.cache:/root/.cache \
     -v /llm_workspace_1P:/llm_workspace_1P:rw \
+    -v /home/jianzhnie/llmtuner:/home/jianzhnie/llmtuner \
     -it ${IMAGE_NAME} \
     /bin/bash -c "while true; do sleep 1000; done"
