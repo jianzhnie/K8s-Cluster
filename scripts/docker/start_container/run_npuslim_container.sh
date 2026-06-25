@@ -12,14 +12,16 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Version info
-CANN_VER="8.5.1"
-TORCH_VER="2.9.0"
-VLLM_VER="0.18.0"
-CHIP_NAME="910c"
+# 加载共享库
+source "${SCRIPT_DIR}/../../common.sh"
+# shellcheck source=./docker_env.sh
+source "${SCRIPT_DIR}/../docker_env.sh"
 
-IMAGE_NAME="ascend${CHIP_NAME}-cann${CANN_VER}-torch${TORCH_VER}-vllm${VLLM_VER}"
-IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+# Version info
+log_info "Version info"
+log_info "IMAGE_NAME: ${IMAGE_NAME}"
+log_info "IMAGE_TAR: ${IMAGE_TAR}"
+log_info "CONTAINER_NAME: ${CONTAINER_NAME}"
 
 # Parse args
 CARDS="0"
@@ -68,8 +70,8 @@ IFS=',' read -ra CARD_ARRAY <<< "$CARDS"
 for cid in "${CARD_ARRAY[@]}"; do
     c0=$((cid * 2))
     c1=$((c0 + 1))
-    CHIP_LIST+=($c0 $c1)
-    VISIBLE_DEVICES+=($c0 $c1)
+    CHIP_LIST+=("$c0" "$c1")
+    VISIBLE_DEVICES+=("$c0" "$c1")
 done
 
 echo "========================================"
@@ -79,7 +81,7 @@ echo "Image:      ${IMAGE_NAME}"
 echo "NPUSlim:    ${WITH_NPUSLIM}"
 echo "Multi-node: ${MULTI_NODE}"
 echo "Daemon:     ${DAEMON}"
-if [ "$MULTI_NODE" = false ]; then
+if [[ "$MULTI_NODE" == false ]]; then
     echo "Cards:      ${CARDS} -> chips ${VISIBLE_DEVICES[*]}"
 fi
 echo ""
@@ -90,12 +92,18 @@ if ! docker image inspect "${IMAGE_NAME}" &>/dev/null; then
     exit 1
 fi
 
+# Check if container exists
+if [[ -n "$(docker ps -aq -f name="^/${CONTAINER_NAME}$")" ]]; then
+    echo "Container '${CONTAINER_NAME}' already exists. Removing it..."
+    docker rm -f "${CONTAINER_NAME}"
+fi
+
 DOCKER_ARGS=(
     -it --rm
     --shm-size=10g
 )
 
-if [ "$MULTI_NODE" = true ]; then
+if [[ "$MULTI_NODE" == true ]]; then
     # ========== Multi-node mode ==========
     echo "Multi-node mode: using host network, all NPUs"
     echo ""
@@ -104,7 +112,7 @@ if [ "$MULTI_NODE" = true ]; then
 
     # All NPU devices
     for i in {0..7}; do
-        DOCKER_ARGS+=(--device=/dev/davinci${i})
+        DOCKER_ARGS+=("--device=/dev/davinci${i}")
     done
     DOCKER_ARGS+=(
         --device=/dev/davinci_manager
@@ -135,6 +143,7 @@ if [ "$MULTI_NODE" = true ]; then
     echo ""
 
     # Multi-node communication env vars
+    # shellcheck disable=SC2054
     DOCKER_ARGS+=(
         -e HCCL_IF_IP="${LOCAL_IP}"
         -e GLOO_SOCKET_IFNAME="${NIC_NAME}"
@@ -145,7 +154,7 @@ if [ "$MULTI_NODE" = true ]; then
 else
     # ========== Single/multi-card mode ==========
     for chip in "${CHIP_LIST[@]}"; do
-        DOCKER_ARGS+=(--device=/dev/davinci${chip})
+        DOCKER_ARGS+=("--device=/dev/davinci${chip}")
     done
     DOCKER_ARGS+=(
         --device=/dev/davinci_manager
@@ -158,38 +167,46 @@ else
         -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro
         -v /etc/ascend_install.info:/etc/ascend_install.info:ro
         -v /var/log/npu:/var/log/npu
-        -e ASCEND_RT_VISIBLE_DEVICES=$(IFS=,; echo "${VISIBLE_DEVICES[*]}")
+        -e "ASCEND_RT_VISIBLE_DEVICES=$(IFS=,; echo "${VISIBLE_DEVICES[*]}")"
     )
 fi
 
 # Common mounts
 DOCKER_ARGS+=(
+    --name "${CONTAINER_NAME}" \
     -v ~/.cache/huggingface:/root/.cache/huggingface
     -v ~/.cache/modelscope:/root/.cache/modelscope
-    -v /data:/data
-    -v /llm_workspace_1P/robin/hfhub/pcl-kimi2:/pcl-kimi2
+    -v /llm_workspace_1P/robin:/llm_workspace_1P/robin
+    -v /home/jianzhnie/llmtuner:/home/jianzhnie/llmtuner
     -e HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 )
 
 INSIDE_CMD=""
 
 # NPUSlim source mount + editable install
-if [ "$WITH_NPUSLIM" = true ]; then
-    SRC_DIR="${NPUSLIM_SRC_PATH:-${SCRIPT_DIR}/npuslim}"
+if [[ "$WITH_NPUSLIM" == true ]]; then
+    if [[ -z "$NPUSLIM_SRC_PATH" ]]; then
+        echo "ERROR: --npuslim requires a path, e.g. --npuslim=/path/to/npuslim"
+        exit 1
+    fi
 
-    if [ ! -d "$SRC_DIR" ] || [ ! -f "$SRC_DIR/pyproject.toml" ]; then
-        echo "ERROR: NPUSlim source not found or invalid: $SRC_DIR"
+    if [ ! -d "$NPUSLIM_SRC_PATH" ] || [ ! -f "$NPUSLIM_SRC_PATH/pyproject.toml" ]; then
+        echo "ERROR: NPUSlim source not found or invalid: $NPUSLIM_SRC_PATH"
         echo "Hint: use --npuslim=/path/to/npuslim"
         exit 1
     fi
 
-    DOCKER_ARGS+=(-v "${SRC_DIR}:/workspace/npuslim:rw")
-    INSIDE_CMD="git config --global --add safe.directory '*'; pip install --no-build-isolation --no-deps --root-user-action=ignore -e /workspace/npuslim -v; "
-    echo "NPUSlim source: ${SRC_DIR}"
+    echo "NPUSlim source: ${NPUSLIM_SRC_PATH}"
     echo "  (mounted to /workspace/npuslim, editable install on start)"
+
+    DOCKER_ARGS+=(-v "${NPUSLIM_SRC_PATH}:/workspace/npuslim:rw")
+    # Clean stale CMake build artifacts that break setuptools package discovery,
+    # 清理 CMake 构建产物 + 跳过算子编译，然后 editable 安装
+    INSIDE_CMD="git config --global --add safe.directory '*'; "
+    INSIDE_CMD+="NPUSLIM_SKIP_OPS=1 pip install --no-build-isolation --no-deps --root-user-action=ignore -e /workspace/npuslim -v;"
 fi
 
-if [ "$DAEMON" = true ]; then
+if [[ "$DAEMON" == true ]]; then
     # Daemon mode: rebuild args (-d instead of -it --rm)
     DAEMON_ARGS=(-d)
     for arg in "${DOCKER_ARGS[@]}"; do
@@ -203,7 +220,7 @@ if [ "$DAEMON" = true ]; then
     echo "To stop:   docker stop ${CONTAINER_ID:0:12}"
 else
     # Interactive mode
-    if [ -n "$INSIDE_CMD" ]; then
+    if [[ -n "$INSIDE_CMD" ]]; then
         exec docker run "${DOCKER_ARGS[@]}" "${IMAGE_NAME}" \
             /bin/bash -lc "${INSIDE_CMD}exec /bin/bash"
     else
