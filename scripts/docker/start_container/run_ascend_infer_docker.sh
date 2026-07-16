@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# Ascend NPU 推理容器启动脚本
+# 用法: bash ascend_infer_docker_run.sh
+# 通过环境变量覆盖: IMAGE_NAME=... CONTAINER_NAME=... bash ascend_infer_docker_run.sh
+
+set -euo pipefail
+
+# Configuration
+IMAGE_NAME="${IMAGE_NAME:-quay.io/ascend/vllm-ascend:v0.18.0rc1-a3-openeuler}"
+CONTAINER_NAME="${CONTAINER_NAME:-vllm-ascend-env-a3}"
+
+# Check if container exists
+if [[ -n "$(docker ps -aq -f name="^/${CONTAINER_NAME}$")" ]]; then
+    echo "Container '${CONTAINER_NAME}' already exists. Removing it..."
+    docker rm -f "${CONTAINER_NAME}"
+fi
+
+# Run Docker container
+# Note if you are running bridge network with docker, please expose available ports
+# for multiple nodes communication in advance.
+docker run -d \
+    -u root \
+    --name "${CONTAINER_NAME}" \
+    --ipc=host \
+    --net=host \
+    --ulimit memlock=-1 \
+    --ulimit stack=-1 \
+    --privileged=true \
+    --device=/dev/davinci0 \
+    --device=/dev/davinci1 \
+    --device=/dev/davinci2 \
+    --device=/dev/davinci3 \
+    --device=/dev/davinci4 \
+    --device=/dev/davinci5 \
+    --device=/dev/davinci6 \
+    --device=/dev/davinci7 \
+    --device=/dev/davinci_manager \
+    --device=/dev/devmm_svm \
+    --device=/dev/hisi_hdc \
+    --shm-size=256g \
+    -e HCCL_BUFFSIZE=1024 \
+    -e HCCL_BUFFER_FILE_SIZE=1024 \
+    -v /usr/local/dcmi:/usr/local/dcmi \
+    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+    -v /usr/local/Ascend/driver:/usr/local/Ascend/driver \
+    -v /usr/local/Ascend/add-ons/:/usr/local/Ascend/add-ons/ \
+    -v /usr/local/Ascend/driver/tools/hccn_tool:/usr/local/Ascend/driver/tools/hccn_tool \
+    -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+    -v /etc/ascend_install.info:/etc/ascend_install.info \
+    -v /root/.cache:/root/.cache \
+    -v /home/jianzhnie/llmtuner:/home/jianzhnie/llmtuner:rw \
+    -v /root/.ssh:/root/.ssh \
+    -it "${IMAGE_NAME}" \
+    /bin/bash -c "while true; do sleep 1000; done"
