@@ -27,20 +27,24 @@ export PARALLELISM="${PARALLELISM:-8}"
 # 2. 容器与镜像配置
 # ------------------------------------------
 
-# export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
-# export IMAGE_NAME="quay.io/ascend/vllm-ascend:v0.20.2rc1-a3"
-# export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/vllm-ascend.v0.20.2rc1-a3.tar}"
-# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/ascend_infer_docker_run.sh}"
-# export CONTAINER_NAME="${CONTAINER_NAME:-vllm-ascend-env}"
+export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
 
-# export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
+export IMAGE_NAME="${IMAGE_NAME:-quay.io/ascend/vllm-ascend:v0.22.1rc1-a3}"
+export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/vllm-ascend.v0.22.1rc1-a3.tar}"
+export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_npuslim_container.sh}"
+export CONTAINER_NAME="${CONTAINER_NAME:-vllm-ascend-env}"
+
 # export IMAGE_NAME="swr.cn-south-1.myhuaweicloud.com/ascendhub/mindspeed-llm:26.0.0-a3-openeuler24.03-py3.11-aarch64"
 # export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/mindspeed-llm-26.0.0-a3-arm.tar.gz}"
-# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_container_train.sh}"
+# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_mindspeed-llm_container.sh}"
 # export CONTAINER_NAME="${CONTAINER_NAME:-mindspeed-llm-env}"
 
-export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
-export IMAGE_NAME="ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0:latest"
-export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0.tar}"
-export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_npuslim_container.sh}"
-export CONTAINER_NAME="${CONTAINER_NAME:-npuslim-env}"
+# export IMAGE_NAME="ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0:latest"
+# export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0.tar}"
+# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_npuslim_container.sh}"
+# export CONTAINER_NAME="${CONTAINER_NAME:-vllm-ascend-env}"
+
+# export IMAGE_NAME="swr.cn-southwest-2.myhuaweicloud.com/base_image/dockerhub/lmsysorg/sglang:cann9.0.0-a3-B140"
+# export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/sglang_cann9.0.0-a3-B140.tar.gz}"
+# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_ascend_infer_docker.sh}"
+# export CONTAINER_NAME="${CONTAINER_NAME:-sglang-ascend-env}"
