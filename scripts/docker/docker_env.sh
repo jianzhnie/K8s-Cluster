@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# 环境变量配置 — Docker 容器管理模块
+#
+# 用法:
+#   source docker_env.sh             # 在调用脚本中 source
+#   VAR=value source docker_env.sh   # 通过环境变量覆盖默认值
+#
+# 环境变量 (均可外部覆盖):
+#   NODES_FILE, SSH_USER_HOST_PREFIX, SSH_OPTS, PARALLELISM
+#   IMAGE_NAME, IMAGE_TAR, RUN_CONTAINER_SCRIPT, CONTAINER_NAME
+#   NPUS_PER_NODE, MASTER_PORT, DASHBOARD_PORT, WAIT_TIME
+
+# 注意: 本文件被 source 而非直接执行，刻意不加 set -euo pipefail，
+#       以免影响调用脚本的 shell 选项。
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ------------------------------------------
+# 1. 部署与节点配置
+# ------------------------------------------
+export SSH_USER_HOST_PREFIX="${SSH_USER_HOST_PREFIX:-}"
+export SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
+export PARALLELISM="${PARALLELISM:-8}"
+
+# ------------------------------------------
+# 2. 容器与镜像配置
+# ------------------------------------------
+
+# export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
+# export IMAGE_NAME="quay.io/ascend/vllm-ascend:v0.20.2rc1-a3"
+# export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/vllm-ascend.v0.20.2rc1-a3.tar}"
+# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/ascend_infer_docker_run.sh}"
+# export CONTAINER_NAME="${CONTAINER_NAME:-vllm-ascend-env}"
+
+# export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
+# export IMAGE_NAME="swr.cn-south-1.myhuaweicloud.com/ascendhub/mindspeed-llm:26.0.0-a3-openeuler24.03-py3.11-aarch64"
+# export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/mindspeed-llm-26.0.0-a3-arm.tar.gz}"
+# export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_container_train.sh}"
+# export CONTAINER_NAME="${CONTAINER_NAME:-mindspeed-llm-env}"
+
+export IMAGE_DIR="${IMAGE_DIR:-/home/jianzhnie/llmtuner/hfhub/docker/image}"
+export IMAGE_NAME="ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0:latest"
+export IMAGE_TAR="${IMAGE_TAR:-${IMAGE_DIR}/ascend910c-cann8.5.1-torch2.9.0-vllm0.18.0.tar}"
+export RUN_CONTAINER_SCRIPT="${RUN_CONTAINER_SCRIPT:-${SCRIPT_DIR}/start_container/run_npuslim_container.sh}"
+export CONTAINER_NAME="${CONTAINER_NAME:-npuslim-env}"

@@ -79,3 +79,7 @@ bash /home/jianzhnie/llmtuner/llm/ascend-llm-ops/tools/auto_mount_dpc.sh \
   -target /home/jianzhnie/llmtuner \
   -mount dpc \
   -user root
+
+
+
+
